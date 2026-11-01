@@ -100,6 +100,7 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	// Repositories.
 	userRepo := storage.NewUserRepo(pool)
 	tokenRepo := storage.NewTokenRepo(pool)
+	secretRepo := storage.NewSecretRepo(pool)
 
 	// Token manager.
 	tokenMgr := auth.NewManager(
@@ -110,6 +111,8 @@ func runServe(cmd *cobra.Command, _ []string) error {
 
 	// Services.
 	authSvc := service.NewAuthService(userRepo, tokenRepo, tokenMgr)
+	secretSvc := service.NewSecretService(secretRepo)
+	syncSvc := service.NewSyncService(secretRepo, secretSvc)
 
 	// TLS credentials.
 	tlsCreds, err := loadTLS(cfg.TLSCertFile, cfg.TLSKeyFile)
@@ -135,6 +138,8 @@ func runServe(cmd *cobra.Command, _ []string) error {
 
 	// Register services.
 	pb.RegisterAuthServiceServer(grpcSrv, transport.NewAuthHandler(authSvc))
+	pb.RegisterSecretServiceServer(grpcSrv, transport.NewSecretHandler(secretSvc, int64(cfg.MaxBinaryMB)*1024*1024))
+	pb.RegisterSyncServiceServer(grpcSrv, transport.NewSyncHandler(syncSvc))
 
 	// Start listener.
 	lis, err := net.Listen("tcp", cfg.GRPCAddr)

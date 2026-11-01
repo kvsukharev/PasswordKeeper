@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: passwordkeeper
+      POSTGRES_USER: passwordkeeper
+      POSTGRES_PASSWORD: passwordkeeper
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U passwordkeeper -d passwordkeeper"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PASSWORDKEEPER_DATABASE_DSN: "postgres://passwordkeeper:passwordkeeper@postgres:5432/passwordkeeper?sslmode=disable"
+      PASSWORDKEEPER_GRPC_ADDR: ":9090"
+      PASSWORDKEEPER_TLS_CERT: "/certs/server.crt"
+      PASSWORDKEEPER_TLS_KEY: "/certs/server.key"
+      PASSWORDKEEPER_JWT_SECRET: "change-me-in-production"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./certs:/certs:ro
+
+volumes:
+  postgres_data:

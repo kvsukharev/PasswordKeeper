@@ -1,0 +1,51 @@
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - gosec
+    - revive
+    - gofmt
+    - goimports
+    - godot
+    - misspell
+    - exhaustive
+    - noctx
+    - unparam
+
+linters-settings:
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+        disabled: false
+  goimports:
+    local-prefixes: github.com/kvsuharev/passwordkeeper
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+  gosec:
+    excludes:
+      - G115  # integer overflow conversion — false-positives in proto code
+  exhaustive:
+    default-signifies-exhaustive: true
+
+issues:
+  exclude-rules:
+    - path: api/gen/
+      linters:
+        - all
+    - path: _test\.go
+      linters:
+        - gosec
+        - errcheck
+    - path: migrations/
+      linters:
+        - all
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -9,8 +9,12 @@ import (
 	"github.com/kvsuharev/passwordkeeper/internal/errs"
 )
 
-// mapError converts a domain error into the appropriate gRPC status error.
+// MapError converts a domain error into the appropriate gRPC status error.
 // Unknown errors are returned as Internal to avoid leaking implementation details.
+func MapError(err error) error {
+	return mapError(err)
+}
+
 func mapError(err error) error {
 	switch {
 	case errors.Is(err, errs.ErrNotFound):

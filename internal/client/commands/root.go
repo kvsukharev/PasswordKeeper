@@ -21,6 +21,14 @@ func NewRootCmd(buildVersion, buildDate, buildCommit string) *cobra.Command {
 	root.AddCommand(newRegisterCmd())
 	root.AddCommand(newLoginCmd())
 	root.AddCommand(newLogoutCmd())
+	root.AddCommand(newAddCmd())
+	root.AddCommand(newListCmd())
+	root.AddCommand(newGetCmd())
+	root.AddCommand(newEditCmd())
+	root.AddCommand(newDeleteCmd())
+	root.AddCommand(newUploadCmd())
+	root.AddCommand(newDownloadCmd())
+	root.AddCommand(newSyncCmd())
 
 	return root
 }

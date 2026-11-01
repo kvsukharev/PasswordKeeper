@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -113,6 +114,24 @@ func (s *SessionStore) get(ctx context.Context, key string) (string, error) {
 		return "", fmt.Errorf("get session[%s]: %w", key, err)
 	}
 	return value, nil
+}
+
+// GetSyncVersion returns the last successfully synced server version (0 if not set).
+func (s *SessionStore) GetSyncVersion(ctx context.Context) (int64, error) {
+	v, err := s.get(ctx, "sync_version")
+	if err != nil {
+		return 0, nil
+	}
+	n, parseErr := strconv.ParseInt(v, 10, 64)
+	if parseErr != nil {
+		return 0, fmt.Errorf("parse sync_version: %w", parseErr)
+	}
+	return n, nil
+}
+
+// SetSyncVersion persists the last successfully synced server version.
+func (s *SessionStore) SetSyncVersion(ctx context.Context, version int64) error {
+	return s.set(ctx, "sync_version", strconv.FormatInt(version, 10))
 }
 
 // ErrNoSession is returned when no active session is found in the local database.

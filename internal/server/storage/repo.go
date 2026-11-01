@@ -1,6 +1,6 @@
 package storage
 
-//go:generate mockgen -destination mock/mock_repos.go -package mockstorage github.com/kvsuharev/passwordkeeper/internal/server/storage UserRepository,TokenRepository
+//go:generate mockgen -destination mock/mock_repos.go -package mockstorage github.com/kvsuharev/passwordkeeper/internal/server/storage UserRepository,TokenRepository,SecretRepository
 
 import (
 	"context"

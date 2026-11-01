@@ -33,6 +33,37 @@ func ReadPassword(prompt string) ([]byte, error) {
 	return pw, nil
 }
 
+// ReadLineWithDefault prompts and returns input, falling back to def when empty.
+func ReadLineWithDefault(prompt, def string) (string, error) {
+	display := prompt
+	if def != "" {
+		display = fmt.Sprintf("%s [%s]: ", strings.TrimSuffix(strings.TrimSuffix(prompt, ": "), " "), def)
+	}
+	val, err := ReadLine(display)
+	if err != nil {
+		return "", err
+	}
+	if val == "" {
+		return def, nil
+	}
+	return val, nil
+}
+
+// ReadPasswordOptional reads a password without echo. Returns nil if the user
+// presses Enter without typing anything (meaning "keep current value").
+func ReadPasswordOptional(prompt string) ([]byte, error) {
+	fmt.Print(prompt)
+	defer fmt.Println()
+	pw, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		return nil, fmt.Errorf("read password: %w", err)
+	}
+	if len(pw) == 0 {
+		return nil, nil
+	}
+	return pw, nil
+}
+
 // ZeroBytes overwrites b with zeros to remove sensitive data from memory.
 func ZeroBytes(b []byte) {
 	for i := range b {
