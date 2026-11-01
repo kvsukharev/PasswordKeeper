@@ -69,6 +69,15 @@ func TestRegisterHandler(t *testing.T) {
 func TestLoginHandler(t *testing.T) {
 	t.Parallel()
 
+	t.Run("missing fields returns InvalidArgument", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		h, _ := newAuthHandler(ctrl)
+
+		_, err := h.Login(context.Background(), &pb.LoginRequest{Login: ""})
+		require.Error(t, err)
+		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
 	t.Run("success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, svc := newAuthHandler(ctrl)
@@ -122,6 +131,17 @@ func TestRefreshHandler(t *testing.T) {
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
+
+	t.Run("service error is mapped", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		h, svc := newAuthHandler(ctrl)
+
+		svc.EXPECT().Refresh(gomock.Any(), "tok").Return(nil, errs.ErrUnauthenticated)
+
+		_, err := h.Refresh(context.Background(), &pb.RefreshRequest{RefreshToken: "tok"})
+		require.Error(t, err)
+		assert.Equal(t, codes.Unauthenticated, status.Code(err))
+	})
 }
 
 func TestLogoutHandler(t *testing.T) {
@@ -144,5 +164,15 @@ func TestLogoutHandler(t *testing.T) {
 		_, err := h.Logout(context.Background(), &pb.LogoutRequest{RefreshToken: ""})
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
+	})
+
+	t.Run("service error is mapped", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		h, svc := newAuthHandler(ctrl)
+
+		svc.EXPECT().Logout(gomock.Any(), "tok").Return(errs.ErrUnauthenticated)
+
+		_, err := h.Logout(context.Background(), &pb.LogoutRequest{RefreshToken: "tok"})
+		require.Error(t, err)
 	})
 }

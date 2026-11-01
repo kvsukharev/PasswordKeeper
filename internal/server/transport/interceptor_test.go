@@ -109,3 +109,18 @@ func TestAuthUnaryInterceptor_MalformedBearer(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, codes.Unauthenticated, status.Code(err))
 }
+
+func TestAuthUnaryInterceptor_MetadataWithoutAuthorization(t *testing.T) {
+	t.Parallel()
+
+	mgr := newTestManager()
+	interceptor := transport.AuthUnaryInterceptor(mgr)
+	info := &grpc.UnaryServerInfo{FullMethod: "/passwordkeeper.v1.SecretService/Get"}
+
+	md := metadata.Pairs("x-custom-header", "value")
+	ctx := metadata.NewIncomingContext(context.Background(), md)
+
+	_, err := interceptor(ctx, nil, info, noopHandler)
+	require.Error(t, err)
+	assert.Equal(t, codes.Unauthenticated, status.Code(err))
+}

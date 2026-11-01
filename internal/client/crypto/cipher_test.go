@@ -70,6 +70,22 @@ func TestEncryptDecrypt(t *testing.T) {
 	})
 }
 
+func TestEncrypt_BadKeyLength(t *testing.T) {
+	t.Parallel()
+
+	_, err := crypto.Encrypt([]byte("tooshort"), []byte("plaintext"), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "create cipher")
+}
+
+func TestDecrypt_BadKeyLength(t *testing.T) {
+	t.Parallel()
+
+	_, err := crypto.Decrypt([]byte("tooshort"), []byte("someciphertext"), nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "create cipher")
+}
+
 func TestMakeAAD(t *testing.T) {
 	t.Parallel()
 

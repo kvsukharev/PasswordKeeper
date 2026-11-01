@@ -1,9 +1,12 @@
 package auth_test
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -41,6 +44,41 @@ func TestGenerateAndValidateAccessToken(t *testing.T) {
 		_, err := other.ValidateAccessToken(token)
 		require.Error(t, err)
 	})
+}
+
+func TestRefreshTTL(t *testing.T) {
+	t.Parallel()
+
+	ttl := 30 * 24 * time.Hour
+	mgr := auth.NewManager("test-secret-32-bytes-long-at-min", 15*time.Minute, ttl)
+	assert.Equal(t, ttl, mgr.RefreshTTL())
+}
+
+func TestValidateAccessToken_Expired(t *testing.T) {
+	t.Parallel()
+
+	mgr := auth.NewManager("test-secret-32-bytes-long-at-min", -time.Minute, 30*24*time.Hour)
+	token, _, err := mgr.GenerateAccessToken("user-x")
+	require.NoError(t, err)
+
+	_, err = mgr.ValidateAccessToken(token)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parse access token")
+}
+
+func TestValidateAccessToken_NonHMACMethod(t *testing.T) {
+	t.Parallel()
+
+	rsaKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	rsaToken := jwt.New(jwt.SigningMethodRS256)
+	tokenStr, err := rsaToken.SignedString(rsaKey)
+	require.NoError(t, err)
+
+	mgr := auth.NewManager("test-secret-32-bytes-long-at-min", 15*time.Minute, 30*24*time.Hour)
+	_, err = mgr.ValidateAccessToken(tokenStr)
+	require.Error(t, err)
 }
 
 func TestGenerateRefreshToken(t *testing.T) {

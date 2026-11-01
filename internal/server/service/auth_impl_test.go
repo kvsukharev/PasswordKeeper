@@ -43,6 +43,17 @@ func TestRegister(t *testing.T) {
 		assert.NotEmpty(t, pair.RefreshToken)
 	})
 
+	t.Run("repo error returns wrapped error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		svc, users, _ := newAuthSvc(ctrl)
+
+		users.EXPECT().Create(gomock.Any(), gomock.Any()).Return(assert.AnError)
+
+		_, err := svc.Register(context.Background(), "alice", []byte("auth-key"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "create user")
+	})
+
 	t.Run("duplicate login returns ErrAlreadyExists", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		svc, users, _ := newAuthSvc(ctrl)
@@ -123,6 +134,14 @@ func TestLogin(t *testing.T) {
 func TestRefresh(t *testing.T) {
 	t.Parallel()
 
+	t.Run("invalid base64 token returns ErrUnauthenticated", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		svc, _, _ := newAuthSvc(ctrl)
+
+		_, err := svc.Refresh(context.Background(), "not-base64!!!")
+		require.ErrorIs(t, err, errs.ErrUnauthenticated)
+	})
+
 	t.Run("valid token is rotated", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		svc, _, tokens := newAuthSvc(ctrl)
@@ -159,6 +178,37 @@ func TestRefresh(t *testing.T) {
 
 		_, err = svc.Refresh(context.Background(), rawToken)
 		require.ErrorIs(t, err, errs.ErrUnauthenticated)
+	})
+
+	t.Run("delete error during rotation returns error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		svc, _, tokens := newAuthSvc(ctrl)
+
+		rawToken, tokenHash, err := auth.GenerateRefreshToken()
+		require.NoError(t, err)
+
+		tokens.EXPECT().GetByHash(gomock.Any(), tokenHash).Return(&model.RefreshToken{
+			TokenHash: tokenHash,
+			UserID:    "user-1",
+			ExpiresAt: time.Now().Add(24 * time.Hour),
+		}, nil)
+		tokens.EXPECT().Delete(gomock.Any(), tokenHash).Return(assert.AnError)
+
+		_, err = svc.Refresh(context.Background(), rawToken)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "rotate refresh token")
+	})
+
+	t.Run("token store error during issue returns error", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		svc, users, tokens := newAuthSvc(ctrl)
+
+		users.EXPECT().Create(gomock.Any(), gomock.Any()).Return(nil)
+		tokens.EXPECT().Create(gomock.Any(), gomock.Any()).Return(assert.AnError)
+
+		_, err := svc.Register(context.Background(), "alice", []byte("auth-key"))
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "store refresh token")
 	})
 
 	t.Run("unknown token returns ErrUnauthenticated", func(t *testing.T) {

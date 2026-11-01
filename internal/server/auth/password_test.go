@@ -45,4 +45,16 @@ func TestHashAndVerifyAuthKey(t *testing.T) {
 		_, err := auth.VerifyAuthKey(key, "not-a-valid-hash")
 		require.Error(t, err)
 	})
+
+	t.Run("invalid salt base64 returns error", func(t *testing.T) {
+		// Construct a hash with a bad salt field (index 4).
+		_, err := auth.VerifyAuthKey(key, "$argon2id$v=19$m=65536,t=1,p=4$!!!invalid!!!$validhash")
+		require.Error(t, err)
+	})
+
+	t.Run("invalid hash base64 returns error", func(t *testing.T) {
+		// Valid salt but bad hash field (index 5).
+		_, err := auth.VerifyAuthKey(key, "$argon2id$v=19$m=65536,t=1,p=4$dGVzdHNhbHQx$!!!invalid!!!")
+		require.Error(t, err)
+	})
 }
