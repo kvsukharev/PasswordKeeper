@@ -102,8 +102,18 @@ func printPayload(out io.Writer, name string, t model.SecretType, version int64,
 			fmt.Fprintf(out, "Expiry: %s\n", p.Card.Expiry)
 			fmt.Fprintf(out, "CVV:    %s\n", mask(p.Card.CVV))
 		}
+	case model.SecretTypeOTP:
+		if p.OTP != nil {
+			fmt.Fprintf(out, "Issuer:    %s\n", p.OTP.Issuer)
+			fmt.Fprintf(out, "Account:   %s\n", p.OTP.Account)
+			fmt.Fprintf(out, "Secret:    %s\n", mask(p.OTP.Secret))
+			fmt.Fprintf(out, "Algorithm: %s\n", p.OTP.Algorithm)
+			fmt.Fprintf(out, "Digits:    %d\n", p.OTP.Digits)
+			fmt.Fprintf(out, "Period:    %ds\n", p.OTP.Period)
+			fmt.Fprintf(out, "\nUse 'passwordkeeper otp %s' to generate the current code.\n", name)
+		}
 	default:
-		fmt.Fprintf(out, "(encrypted binary/OTP — use sync to export)\n")
+		fmt.Fprintf(out, "(encrypted binary — use 'download' to export)\n")
 	}
 
 	if len(p.Meta.Pairs) > 0 || p.Meta.Note != "" {

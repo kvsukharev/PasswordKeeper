@@ -43,8 +43,10 @@ func parseSecretType(s string) (pb.SecretType, model.SecretType, error) {
 		return pb.SecretType_SECRET_TYPE_TEXT, model.SecretTypeText, nil
 	case "card":
 		return pb.SecretType_SECRET_TYPE_CARD, model.SecretTypeCard, nil
+	case "otp":
+		return pb.SecretType_SECRET_TYPE_OTP, model.SecretTypeOTP, nil
 	default:
-		return 0, "", fmt.Errorf("unknown type %q: use credentials, text, or card", s)
+		return 0, "", fmt.Errorf("unknown type %q: use credentials, text, card, or otp", s)
 	}
 }
 

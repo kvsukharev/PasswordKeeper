@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,7 +22,7 @@ import (
 func newAddCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <type>",
-		Short: "Add a new secret (type: credentials, text, card)",
+		Short: "Add a new secret (type: credentials, text, card, otp)",
 		Args:  cobra.ExactArgs(1),
 		RunE:  runAdd,
 	}
@@ -218,6 +219,65 @@ func promptNewPayload(t model.SecretType) (*model.Payload, error) {
 			Expiry: expiry,
 			CVV:    cvv,
 		}
+	case model.SecretTypeOTP:
+		issuer, err := ReadLine("Issuer (e.g. GitHub): ")
+		if err != nil {
+			return nil, err
+		}
+		account, err := ReadLine("Account (e.g. alice@example.com): ")
+		if err != nil {
+			return nil, err
+		}
+		secret, err := ReadLine("Base32 secret: ")
+		if err != nil {
+			return nil, err
+		}
+		if otpErr := validator.ValidateOTPSecret(secret); otpErr != nil {
+			return nil, otpErr
+		}
+		algoStr, err := ReadLine("Algorithm (SHA1/SHA256/SHA512) [SHA1]: ")
+		if err != nil {
+			return nil, err
+		}
+		if algoStr == "" {
+			algoStr = "SHA1"
+		}
+		algoStr = strings.ToUpper(algoStr)
+		if algoStr != "SHA1" && algoStr != "SHA256" && algoStr != "SHA512" {
+			return nil, fmt.Errorf("unsupported algorithm %q: use SHA1, SHA256, or SHA512", algoStr)
+		}
+		digitsStr, err := ReadLine("Digits (6 or 8) [6]: ")
+		if err != nil {
+			return nil, err
+		}
+		digits := 6
+		if digitsStr != "" {
+			digits, err = strconv.Atoi(digitsStr)
+			if err != nil || (digits != 6 && digits != 8) {
+				return nil, fmt.Errorf("digits must be 6 or 8")
+			}
+		}
+		periodStr, err := ReadLine("Period in seconds [30]: ")
+		if err != nil {
+			return nil, err
+		}
+		period := uint(30)
+		if periodStr != "" {
+			n, pErr := strconv.ParseUint(periodStr, 10, 32)
+			if pErr != nil || n == 0 {
+				return nil, fmt.Errorf("period must be a positive integer")
+			}
+			period = uint(n)
+		}
+		payload.OTP = &model.OTPPayload{
+			Issuer:    issuer,
+			Account:   account,
+			Secret:    strings.ToUpper(strings.TrimSpace(secret)),
+			Algorithm: algoStr,
+			Digits:    digits,
+			Period:    period,
+		}
+
 	default:
 		return nil, fmt.Errorf("unsupported type %q for interactive add", t)
 	}

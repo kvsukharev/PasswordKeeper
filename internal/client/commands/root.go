@@ -29,6 +29,8 @@ func NewRootCmd(buildVersion, buildDate, buildCommit string) *cobra.Command {
 	root.AddCommand(newUploadCmd())
 	root.AddCommand(newDownloadCmd())
 	root.AddCommand(newSyncCmd())
+	root.AddCommand(newOtpCmd())
+	root.AddCommand(newTUICmd())
 
 	return root
 }

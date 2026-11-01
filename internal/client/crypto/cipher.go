@@ -62,3 +62,10 @@ func Decrypt(key, ciphertext, aad []byte) ([]byte, error) {
 func MakeAAD(secretID, secretType string) []byte {
 	return []byte(secretID + ":" + secretType)
 }
+
+// ZeroBytes overwrites b with zeros to remove sensitive data from memory.
+func ZeroBytes(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
+}

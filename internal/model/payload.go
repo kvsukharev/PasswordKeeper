@@ -7,6 +7,7 @@ type Payload struct {
 	Credentials *CredentialsPayload `json:"credentials,omitempty"`
 	Text        *TextPayload        `json:"text,omitempty"`
 	Card        *CardPayload        `json:"card,omitempty"`
+	OTP         *OTPPayload         `json:"otp,omitempty"`
 	Meta        Metadata            `json:"meta"`
 }
 
@@ -28,6 +29,24 @@ type CardPayload struct {
 	Holder string `json:"holder"`
 	Expiry string `json:"expiry"` // MM/YY
 	CVV    string `json:"cvv"`
+}
+
+// OTPPayload holds a TOTP/HOTP one-time-password configuration.
+// The Secret field is a base32-encoded seed; it is encrypted together with
+// all other payload fields and never leaves the client in plaintext.
+type OTPPayload struct {
+	// Issuer is the organisation that issued the OTP credential (e.g. "GitHub").
+	Issuer string `json:"issuer"`
+	// Account is the account identifier (e.g. "alice@example.com").
+	Account string `json:"account"`
+	// Secret is the base32-encoded TOTP/HOTP seed.
+	Secret string `json:"secret"`
+	// Algorithm is the HMAC hash algorithm: SHA1, SHA256 or SHA512.
+	Algorithm string `json:"algorithm"`
+	// Digits is the number of digits in each OTP code (6 or 8).
+	Digits int `json:"digits"`
+	// Period is the TOTP step in seconds (default 30).
+	Period uint `json:"period"`
 }
 
 // Metadata is an optional bag of key-value pairs and a free-text note attached

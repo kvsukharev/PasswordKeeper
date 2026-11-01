@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"encoding/base32"
 	"fmt"
 	"strconv"
 	"strings"
@@ -60,6 +61,20 @@ func ValidateCVV(cvv string) error {
 		if c < '0' || c > '9' {
 			return fmt.Errorf("CVV must contain only digits")
 		}
+	}
+	return nil
+}
+
+// ValidateOTPSecret checks that secret is a valid base32-encoded TOTP seed.
+// Padding is optional; the check is case-insensitive.
+func ValidateOTPSecret(secret string) error {
+	upper := strings.ToUpper(strings.TrimSpace(secret))
+	// Add padding if necessary.
+	if rem := len(upper) % 8; rem != 0 {
+		upper += strings.Repeat("=", 8-rem)
+	}
+	if _, err := base32.StdEncoding.DecodeString(upper); err != nil {
+		return fmt.Errorf("OTP secret must be a valid base32 string: %w", err)
 	}
 	return nil
 }
