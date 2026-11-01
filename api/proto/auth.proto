@@ -1,0 +1,59 @@
+// Package passwordkeeper defines the gRPC API for the PasswordKeeper password manager.
+syntax = "proto3";
+
+package passwordkeeper.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/kvsuharev/passwordkeeper/api/gen;passwordkeeperv1";
+
+// TokenPair holds a short-lived access JWT and a long-lived refresh token.
+message TokenPair {
+  // access_token is a signed JWT valid for 15 minutes.
+  string access_token = 1;
+  // refresh_token is an opaque token valid for 30 days.
+  string refresh_token = 2;
+  // expires_at is the expiry time of the access token.
+  google.protobuf.Timestamp expires_at = 3;
+}
+
+// RegisterRequest carries the credentials for a new user.
+message RegisterRequest {
+  // login is the unique username (3–64 characters).
+  string login = 1;
+  // auth_key is Argon2id(password, salt_auth) computed on the client.
+  bytes auth_key = 2;
+}
+
+// LoginRequest carries the credentials for authentication.
+message LoginRequest {
+  // login is the unique username.
+  string login = 1;
+  // auth_key is Argon2id(password, salt_auth) computed on the client.
+  bytes auth_key = 2;
+}
+
+// RefreshRequest asks for a new token pair using the current refresh token.
+message RefreshRequest {
+  // refresh_token is the current valid refresh token.
+  string refresh_token = 1;
+}
+
+// LogoutRequest invalidates the given refresh token.
+message LogoutRequest {
+  // refresh_token is the token to invalidate.
+  string refresh_token = 1;
+}
+
+// AuthService handles user registration, authentication and token management.
+service AuthService {
+  // Register creates a new user account and returns an initial token pair.
+  rpc Register(RegisterRequest) returns (TokenPair);
+  // Login authenticates a user and returns a token pair.
+  rpc Login(LoginRequest) returns (TokenPair);
+  // Refresh exchanges a valid refresh token for a new token pair.
+  rpc Refresh(RefreshRequest) returns (TokenPair);
+  // Logout invalidates the given refresh token.
+  rpc Logout(LogoutRequest) returns (google.protobuf.Empty);
+}
