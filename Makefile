@@ -18,7 +18,7 @@ PROTOC_GEN_GO   := $(GOBIN)/protoc-gen-go
 PROTOC_GEN_GRPC := $(GOBIN)/protoc-gen-go-grpc
 GOLANGCI_LINT   := $(GOBIN)/golangci-lint
 
-.PHONY: all build build-server build-client test cover lint proto certs \
+.PHONY: all build build-server build-client test test-integration cover lint proto certs \
         docker-up docker-down migrate clean tools
 
 all: build
@@ -40,6 +40,10 @@ test:
 		echo "Warning: gcc not found, running tests without -race"; \
 		go test -count=1 ./...; \
 	fi
+
+## test-integration: run integration tests (requires Docker)
+test-integration:
+	go test -tags integration -count=1 -timeout 120s ./internal/server/storage/...
 
 ## cover: run tests and check coverage ≥ 70%
 cover:

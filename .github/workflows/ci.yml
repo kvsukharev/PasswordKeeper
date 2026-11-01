@@ -41,6 +41,18 @@ jobs:
           go tool cover -func=coverage.out
           awk '/^total:/{gsub("%",""); if ($3+0 < 70) {print "Coverage "$3"% < 70%"; exit 1}}' coverage.out
 
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+      - name: integration tests (testcontainers)
+        run: go test -tags integration -count=1 -timeout 120s ./internal/server/storage/...
+
   build:
     name: Build
     runs-on: ubuntu-latest

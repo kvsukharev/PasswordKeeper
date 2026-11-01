@@ -26,13 +26,20 @@ type Config struct {
 	AccessTTLMin int
 	// RefreshTTLDays is the refresh-token lifetime in days.
 	RefreshTTLDays int
+	// LoginRateRPS is the sustained per-IP request rate allowed for Login and
+	// Register, in requests per second.
+	LoginRateRPS float64
+	// LoginRateBurst is the maximum burst size for the Login/Register rate limiter.
+	LoginRateBurst int
 }
 
 const (
-	defaultGRPCAddr      = ":9090"
-	defaultMaxBinaryMB   = 50
-	defaultAccessTTLMin  = 15
-	defaultRefreshTTLDay = 30
+	defaultGRPCAddr       = ":9090"
+	defaultMaxBinaryMB    = 50
+	defaultAccessTTLMin   = 15
+	defaultRefreshTTLDay  = 30
+	defaultLoginRateRPS   = 5.0
+	defaultLoginRateBurst = 10
 )
 
 // RegisterFlags adds all server flags to cmd and returns a Load function bound
@@ -45,6 +52,10 @@ func RegisterFlags(cmd *cobra.Command) {
 	cmd.Flags().String("jwt-secret", "", "JWT signing secret [$PASSWORDKEEPER_JWT_SECRET]")
 	cmd.Flags().Int64("max-binary-mb", defaultMaxBinaryMB,
 		"Max binary secret size in MiB [$PASSWORDKEEPER_MAX_BINARY_MB]")
+	cmd.Flags().Float64("login-rate-rps", defaultLoginRateRPS,
+		"Sustained rate limit for Login/Register per IP in req/s [$PASSWORDKEEPER_LOGIN_RATE_RPS]")
+	cmd.Flags().Int("login-rate-burst", defaultLoginRateBurst,
+		"Burst size for Login/Register rate limiter [$PASSWORDKEEPER_LOGIN_RATE_BURST]")
 }
 
 // Load reads configuration from cmd flags with fallback to environment variables.
@@ -58,6 +69,8 @@ func Load(cmd *cobra.Command) (*Config, error) {
 		MaxBinaryMB:    int64OrEnv(cmd, "max-binary-mb", "PASSWORDKEEPER_MAX_BINARY_MB", defaultMaxBinaryMB),
 		AccessTTLMin:   defaultAccessTTLMin,
 		RefreshTTLDays: defaultRefreshTTLDay,
+		LoginRateRPS:   float64OrEnv(cmd, "login-rate-rps", "PASSWORDKEEPER_LOGIN_RATE_RPS", defaultLoginRateRPS),
+		LoginRateBurst: intOrEnv(cmd, "login-rate-burst", "PASSWORDKEEPER_LOGIN_RATE_BURST", defaultLoginRateBurst),
 	}
 	return cfg, cfg.validate()
 }
@@ -98,6 +111,36 @@ func int64OrEnv(cmd *cobra.Command, flag, envKey string, fallback int64) int64 {
 	}
 	if v := os.Getenv(envKey); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+// intOrEnv is like flagOrEnv but for int values.
+func intOrEnv(cmd *cobra.Command, flag, envKey string, fallback int) int {
+	if f := cmd.Flags().Lookup(flag); f != nil && f.Changed {
+		if v, err := strconv.Atoi(f.Value.String()); err == nil {
+			return v
+		}
+	}
+	if v := os.Getenv(envKey); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+// float64OrEnv is like flagOrEnv but for float64 values.
+func float64OrEnv(cmd *cobra.Command, flag, envKey string, fallback float64) float64 {
+	if f := cmd.Flags().Lookup(flag); f != nil && f.Changed {
+		if v, err := strconv.ParseFloat(f.Value.String(), 64); err == nil {
+			return v
+		}
+	}
+	if v := os.Getenv(envKey); v != "" {
+		if n, err := strconv.ParseFloat(v, 64); err == nil {
 			return n
 		}
 	}

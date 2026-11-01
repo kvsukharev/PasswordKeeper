@@ -120,6 +120,9 @@ func runServe(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("load TLS: %w", err)
 	}
 
+	// Rate limiter for Login and Register.
+	rateLimiter := transport.NewRateLimiter(cfg.LoginRateRPS, cfg.LoginRateBurst)
+
 	// gRPC server.
 	maxMsgBytes := int(cfg.MaxBinaryMB) * 1024 * 1024
 	grpcSrv := grpc.NewServer(
@@ -128,6 +131,7 @@ func runServe(cmd *cobra.Command, _ []string) error {
 		grpc.MaxSendMsgSize(maxMsgBytes),
 		grpc.ChainUnaryInterceptor(
 			loggingUnaryInterceptor(logger),
+			transport.RateLimitUnaryInterceptor(rateLimiter),
 			transport.AuthUnaryInterceptor(tokenMgr),
 		),
 		grpc.ChainStreamInterceptor(
