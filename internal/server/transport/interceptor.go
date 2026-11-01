@@ -12,10 +12,13 @@ import (
 	"github.com/kvsuharev/passwordkeeper/internal/server/auth"
 )
 
-// publicMethods lists gRPC full method names that do not require authentication.
+// publicMethods lists gRPC full method names that do not require a Bearer access
+// token. Register and Login use password-based auth; Refresh authenticates via
+// the refresh token carried in the request body.
 var publicMethods = map[string]struct{}{
 	"/passwordkeeper.v1.AuthService/Register": {},
 	"/passwordkeeper.v1.AuthService/Login":    {},
+	"/passwordkeeper.v1.AuthService/Refresh":  {},
 }
 
 // AuthUnaryInterceptor returns a gRPC unary interceptor that validates the
