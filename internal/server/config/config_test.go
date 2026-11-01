@@ -118,3 +118,42 @@ func TestLoad_MissingJWTSecret(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "JWT secret")
 }
+
+func TestLoad_RateLimitFlags(t *testing.T) {
+	cmd := newCmd(t)
+	flags := append(validFlags(),
+		"--login-rate-rps", "2.5",
+		"--login-rate-burst", "20",
+	)
+	require.NoError(t, cmd.ParseFlags(flags))
+
+	cfg, err := config.Load(cmd)
+	require.NoError(t, err)
+	assert.InDelta(t, 2.5, cfg.LoginRateRPS, 0.001)
+	assert.Equal(t, 20, cfg.LoginRateBurst)
+}
+
+func TestLoad_RateLimitEnv(t *testing.T) {
+	t.Setenv("PASSWORDKEEPER_LOGIN_RATE_RPS", "3.0")
+	t.Setenv("PASSWORDKEEPER_LOGIN_RATE_BURST", "15")
+	t.Setenv("PASSWORDKEEPER_DATABASE_DSN", "postgres://envhost/db")
+	t.Setenv("PASSWORDKEEPER_TLS_CERT", "/tmp/cert")
+	t.Setenv("PASSWORDKEEPER_TLS_KEY", "/tmp/key")
+	t.Setenv("PASSWORDKEEPER_JWT_SECRET", "env-secret")
+
+	cmd := newCmd(t)
+	cfg, err := config.Load(cmd)
+	require.NoError(t, err)
+	assert.InDelta(t, 3.0, cfg.LoginRateRPS, 0.001)
+	assert.Equal(t, 15, cfg.LoginRateBurst)
+}
+
+func TestLoad_RateLimitDefaults(t *testing.T) {
+	cmd := newCmd(t)
+	require.NoError(t, cmd.ParseFlags(validFlags()))
+
+	cfg, err := config.Load(cmd)
+	require.NoError(t, err)
+	assert.InDelta(t, 5.0, cfg.LoginRateRPS, 0.001)
+	assert.Equal(t, 10, cfg.LoginRateBurst)
+}

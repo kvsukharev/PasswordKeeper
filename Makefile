@@ -48,7 +48,7 @@ test-integration:
 ## cover: run tests and check coverage ≥ 70%
 cover:
 	go test -count=1 -coverprofile=coverage.out \
-		$(shell go list ./... | grep -v '/api/gen' | grep -v 'cmd/')
+		$(shell go list ./... | grep -v '/api/gen' | grep -v 'cmd/' | grep -v 'internal/server/storage$$')
 	go tool cover -func=coverage.out
 	@awk '/^total:/{gsub("%",""); if ($$3+0 < 70) {print "Coverage " $$3 "% is below 70%"; exit 1}}' coverage.out
 

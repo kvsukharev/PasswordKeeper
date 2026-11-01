@@ -92,3 +92,20 @@ func TestMakeAAD(t *testing.T) {
 	aad := crypto.MakeAAD("id-1", "credentials")
 	assert.Equal(t, []byte("id-1:credentials"), aad)
 }
+
+func TestZeroBytes(t *testing.T) {
+	t.Parallel()
+
+	b := []byte("sensitive-data")
+	crypto.ZeroBytes(b)
+	for _, v := range b {
+		assert.Equal(t, byte(0), v)
+	}
+}
+
+func TestZeroBytes_Nil(t *testing.T) {
+	t.Parallel()
+	// Must not panic on nil or empty slice.
+	crypto.ZeroBytes(nil)
+	crypto.ZeroBytes([]byte{})
+}

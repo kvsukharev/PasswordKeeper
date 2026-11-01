@@ -184,6 +184,17 @@ func TestPromptEditPayload_Credentials_ReadPasswordFails(t *testing.T) {
 	require.Error(t, err) // term.ReadPassword fails on pipe
 }
 
+func TestPromptNewPayload_OTP_FirstLineOnly(t *testing.T) {
+	// bufio.NewReader buffers the whole pipe on first read; only the first
+	// ReadLine gets data, the second gets EOF — that's sufficient to exercise
+	// the OTP branch entry and its error handling.
+	restore := replaceStdin(t, "GitHub\n")
+	defer restore()
+
+	_, err := promptNewPayload(model.SecretTypeOTP)
+	require.Error(t, err) // EOF on second ReadLine (account)
+}
+
 func TestRefreshSessionIfNeeded_NotExpired(t *testing.T) {
 	sess := &storage.Session{
 		AccessToken: "original-token",

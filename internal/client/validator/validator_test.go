@@ -51,3 +51,20 @@ func TestValidateCVV(t *testing.T) {
 	assert.Error(t, validator.ValidateCVV("12345"))
 	assert.Error(t, validator.ValidateCVV("12a"))
 }
+
+func TestValidateOTPSecret(t *testing.T) {
+	t.Parallel()
+
+	// Valid base32 secrets (no padding needed)
+	assert.NoError(t, validator.ValidateOTPSecret("JBSWY3DPEHPK3PXP"))
+	// Valid with lowercase
+	assert.NoError(t, validator.ValidateOTPSecret("jbswy3dpehpk3pxp"))
+	// Valid with leading/trailing spaces
+	assert.NoError(t, validator.ValidateOTPSecret("  JBSWY3DPEHPK3PXP  "))
+	// Valid short secret that needs padding
+	assert.NoError(t, validator.ValidateOTPSecret("MFRA"))
+	// Invalid: not base32
+	assert.Error(t, validator.ValidateOTPSecret("not-valid-base32!!!"))
+	// Invalid: contains 9 (not in base32 alphabet)
+	assert.Error(t, validator.ValidateOTPSecret("99999999"))
+}
