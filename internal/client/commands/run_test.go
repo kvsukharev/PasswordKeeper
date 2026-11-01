@@ -14,7 +14,7 @@ import (
 
 // prepareDB opens (or creates) the SQLite DB for the given dataDir and saves a
 // test session so commands that require a session can run.
-func prepareDB(t *testing.T, dataDir string) *storage.SessionStore {
+func prepareDB(t *testing.T, dataDir string) {
 	t.Helper()
 	db, err := storage.OpenDB(dataDir)
 	require.NoError(t, err)
@@ -28,7 +28,6 @@ func prepareDB(t *testing.T, dataDir string) *storage.SessionStore {
 	}
 	store := storage.NewSessionStore(db)
 	require.NoError(t, store.Save(context.Background(), sess))
-	return store
 }
 
 // --- runList tests ---

@@ -22,10 +22,10 @@ func openTestDBRaw(t *testing.T) *sql.DB {
 	return db
 }
 
-func newStores(t *testing.T) (*storage.SecretStore, *storage.PendingStore, *storage.SessionStore) {
+func newStores(t *testing.T) (*storage.SecretStore, *storage.PendingStore) {
 	t.Helper()
 	db := openTestDBRaw(t)
-	return storage.NewSecretStore(db), storage.NewPendingStore(db), storage.NewSessionStore(db)
+	return storage.NewSecretStore(db), storage.NewPendingStore(db)
 }
 
 func sampleSecret() *storage.LocalSecret {
@@ -45,7 +45,7 @@ func sampleSecret() *storage.LocalSecret {
 func TestSecretStore_UpsertAndGetByID(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 	ctx := context.Background()
 
 	require.NoError(t, secrets.Upsert(ctx, sampleSecret()))
@@ -60,7 +60,7 @@ func TestSecretStore_UpsertAndGetByID(t *testing.T) {
 func TestSecretStore_UpsertUpdatesExisting(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 	ctx := context.Background()
 
 	require.NoError(t, secrets.Upsert(ctx, sampleSecret()))
@@ -81,7 +81,7 @@ func TestSecretStore_UpsertUpdatesExisting(t *testing.T) {
 func TestSecretStore_GetByName(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 	ctx := context.Background()
 
 	require.NoError(t, secrets.Upsert(ctx, sampleSecret()))
@@ -94,7 +94,7 @@ func TestSecretStore_GetByName(t *testing.T) {
 func TestSecretStore_GetByName_NotFound(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 
 	_, err := secrets.GetByName(context.Background(), "nonexistent")
 	require.ErrorIs(t, err, storage.ErrSecretNotFound)
@@ -103,7 +103,7 @@ func TestSecretStore_GetByName_NotFound(t *testing.T) {
 func TestSecretStore_List(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 	ctx := context.Background()
 
 	s1 := sampleSecret()
@@ -122,7 +122,7 @@ func TestSecretStore_List(t *testing.T) {
 func TestSecretStore_List_ExcludesDeleted(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 	ctx := context.Background()
 
 	require.NoError(t, secrets.Upsert(ctx, sampleSecret()))
@@ -136,7 +136,7 @@ func TestSecretStore_List_ExcludesDeleted(t *testing.T) {
 func TestSecretStore_SoftDelete(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 	ctx := context.Background()
 
 	require.NoError(t, secrets.Upsert(ctx, sampleSecret()))
@@ -150,7 +150,7 @@ func TestSecretStore_SoftDelete(t *testing.T) {
 func TestSecretStore_GetByID_NotFound(t *testing.T) {
 	t.Parallel()
 
-	secrets, _, _ := newStores(t)
+	secrets, _ := newStores(t)
 
 	_, err := secrets.GetByID(context.Background(), "missing")
 	require.ErrorIs(t, err, storage.ErrSecretNotFound)
@@ -161,7 +161,7 @@ func TestSecretStore_GetByID_NotFound(t *testing.T) {
 func TestPendingStore_EnqueueAndList(t *testing.T) {
 	t.Parallel()
 
-	_, pending, _ := newStores(t)
+	_, pending := newStores(t)
 	ctx := context.Background()
 
 	require.NoError(t, pending.Enqueue(ctx, &storage.PendingChange{
@@ -182,7 +182,7 @@ func TestPendingStore_EnqueueAndList(t *testing.T) {
 func TestPendingStore_Clear(t *testing.T) {
 	t.Parallel()
 
-	_, pending, _ := newStores(t)
+	_, pending := newStores(t)
 	ctx := context.Background()
 
 	for i := 0; i < 3; i++ {
@@ -204,7 +204,7 @@ func TestPendingStore_Clear(t *testing.T) {
 func TestPendingStore_ListOrdered(t *testing.T) {
 	t.Parallel()
 
-	_, pending, _ := newStores(t)
+	_, pending := newStores(t)
 	ctx := context.Background()
 
 	for _, action := range []string{"create", "update", "delete"} {
@@ -273,4 +273,3 @@ func TestSessionStore_Load_BadExpiresAt(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "parse expires_at")
 }
-

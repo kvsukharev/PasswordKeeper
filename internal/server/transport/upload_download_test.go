@@ -43,12 +43,12 @@ func (s *uploadStream) Recv() (*pb.UploadChunk, error) {
 	return c, nil
 }
 func (s *uploadStream) SendAndClose(meta *pb.SecretMeta) error { s.closed = meta; return nil }
-func (s *uploadStream) SetHeader(metadata.MD) error           { return nil }
-func (s *uploadStream) SendHeader(metadata.MD) error          { return nil }
-func (s *uploadStream) SetTrailer(metadata.MD)                {}
-func (s *uploadStream) Context() context.Context              { return s.ctx }
-func (s *uploadStream) SendMsg(any) error                     { return nil }
-func (s *uploadStream) RecvMsg(any) error                     { return nil }
+func (s *uploadStream) SetHeader(metadata.MD) error            { return nil }
+func (s *uploadStream) SendHeader(metadata.MD) error           { return nil }
+func (s *uploadStream) SetTrailer(metadata.MD)                 {}
+func (s *uploadStream) Context() context.Context               { return s.ctx }
+func (s *uploadStream) SendMsg(any) error                      { return nil }
+func (s *uploadStream) RecvMsg(any) error                      { return nil }
 
 // ---- Download stream stub ----
 
@@ -62,12 +62,12 @@ func newDownloadStream(ctx context.Context) *downloadStream {
 }
 
 func (s *downloadStream) Send(c *pb.DownloadChunk) error { s.chunks = append(s.chunks, c); return nil }
-func (s *downloadStream) SetHeader(metadata.MD) error   { return nil }
-func (s *downloadStream) SendHeader(metadata.MD) error  { return nil }
-func (s *downloadStream) SetTrailer(metadata.MD)        {}
-func (s *downloadStream) Context() context.Context      { return s.ctx }
-func (s *downloadStream) SendMsg(any) error             { return nil }
-func (s *downloadStream) RecvMsg(any) error             { return nil }
+func (s *downloadStream) SetHeader(metadata.MD) error    { return nil }
+func (s *downloadStream) SendHeader(metadata.MD) error   { return nil }
+func (s *downloadStream) SetTrailer(metadata.MD)         {}
+func (s *downloadStream) Context() context.Context       { return s.ctx }
+func (s *downloadStream) SendMsg(any) error              { return nil }
+func (s *downloadStream) RecvMsg(any) error              { return nil }
 
 // ---- helpers ----
 

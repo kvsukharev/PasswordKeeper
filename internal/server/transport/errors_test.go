@@ -15,9 +15,9 @@ func TestMapError(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
-		name  string
-		err   error
-		code  codes.Code
+		name string
+		err  error
+		code codes.Code
 	}{
 		{"not found", errs.ErrNotFound, codes.NotFound},
 		{"already exists", errs.ErrAlreadyExists, codes.AlreadyExists},

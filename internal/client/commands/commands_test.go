@@ -21,10 +21,10 @@ func TestParseSecretType(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		input      string
-		wantPb     pb.SecretType
-		wantModel  model.SecretType
-		wantErr    bool
+		input     string
+		wantPb    pb.SecretType
+		wantModel model.SecretType
+		wantErr   bool
 	}{
 		{"credentials", pb.SecretType_SECRET_TYPE_CREDENTIALS, model.SecretTypeCredentials, false},
 		{"creds", pb.SecretType_SECRET_TYPE_CREDENTIALS, model.SecretTypeCredentials, false},
