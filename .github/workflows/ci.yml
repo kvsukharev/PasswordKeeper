@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.61.0
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+      - name: go vet
+        run: go vet ./...
+      - name: unit tests with race detector
+        run: go test -race -count=1 ./...
+      - name: coverage check
+        run: |
+          go test -race -count=1 -coverprofile=coverage.out \
+            $(go list ./... | grep -v '/api/gen' | grep -v 'cmd/')
+          go tool cover -func=coverage.out
+          awk '/^total:/{gsub("%",""); if ($3+0 < 70) {print "Coverage "$3"% < 70%"; exit 1}}' coverage.out
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+      - name: integration tests (testcontainers)
+        run: go test -tags integration -count=1 -timeout 120s ./internal/server/storage/...
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache: true
+      - name: build server and client
+        run: make build

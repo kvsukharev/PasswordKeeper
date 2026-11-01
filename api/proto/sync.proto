@@ -1,0 +1,84 @@
+// Package passwordkeeper defines the gRPC API for the PasswordKeeper password manager.
+syntax = "proto3";
+
+package passwordkeeper.v1;
+
+option go_package = "github.com/kvsuharev/passwordkeeper/api/gen;passwordkeeperv1";
+
+import "secret.proto";
+
+// ChangeAction describes how a secret was changed in a Push request.
+enum ChangeAction {
+  CHANGE_ACTION_UNSPECIFIED = 0;
+  CHANGE_ACTION_CREATE      = 1;
+  CHANGE_ACTION_UPDATE      = 2;
+  CHANGE_ACTION_DELETE      = 3;
+}
+
+// SecretChange carries one local modification to be applied on the server.
+message SecretChange {
+  // action describes whether this is a create, update, or delete.
+  ChangeAction action = 1;
+  // id is the UUID of the secret being changed.
+  string id = 2;
+  // type is the kind of secret (required for CREATE).
+  SecretType type = 3;
+  // name is the human-readable label (required for CREATE/UPDATE).
+  string name = 4;
+  // payload is the encrypted content (required for CREATE/UPDATE).
+  bytes payload = 5;
+  // base_version is the last known server version; 0 for CREATE.
+  int64 base_version = 6;
+}
+
+// ConflictInfo describes a server-side conflict that could not be auto-resolved.
+message ConflictInfo {
+  // id is the UUID of the conflicting secret.
+  string id = 1;
+  // server_secret is the current server-side secret that caused the conflict.
+  Secret server_secret = 2;
+}
+
+// ChangeResult reports the outcome of a single change in a Push.
+message ChangeResult {
+  // id is the UUID of the secret.
+  string id = 1;
+  // new_version is the version assigned by the server after applying the change.
+  int64 new_version = 2;
+}
+
+// PullRequest asks for all changes after a given version.
+message PullRequest {
+  // since_version is the last version the client has; 0 fetches everything.
+  int64 since_version = 1;
+}
+
+// PullResponse returns the changed secrets and the current server version.
+message PullResponse {
+  // secrets contains all secrets (including deleted) with version > since_version.
+  repeated Secret secrets = 1;
+  // current_version is the highest version on the server at the time of the call.
+  int64 current_version = 2;
+}
+
+// PushRequest contains the batch of local changes to apply.
+message PushRequest {
+  // changes is the ordered list of local modifications.
+  repeated SecretChange changes = 1;
+}
+
+// PushResponse reports results and conflicts for each change.
+message PushResponse {
+  // results maps secret id to the new server version for applied changes.
+  repeated ChangeResult results = 1;
+  // conflicts lists changes that could not be applied due to version mismatch.
+  repeated ConflictInfo conflicts = 2;
+}
+
+// SyncService provides version-based synchronisation between clients.
+service SyncService {
+  // Pull fetches all secrets changed after the given version.
+  rpc Pull(PullRequest) returns (PullResponse);
+  // Push applies a batch of local changes to the server.
+  rpc Push(PushRequest) returns (PushResponse);
+}
