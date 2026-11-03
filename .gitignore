@@ -28,6 +28,21 @@ go.work.sum
 # env file
 .env
 
+# Build outputs
+bin/
+dist/
+
+# TLS certificates (generate with: make certs)
+deploy/certs/*.key
+deploy/certs/*.crt
+deploy/certs/*.srl
+
+# Local config
+*.local.json
+
+# Documentation (contains ТЗ, not for VCS)
+docs/
+
 # Editor/IDE
 # .idea/
 # .vscode/
