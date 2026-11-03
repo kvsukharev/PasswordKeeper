@@ -20,18 +20,18 @@ func newRateLimitInterceptor(rl *transport.RateLimiter) grpc.UnaryServerIntercep
 
 // newZeroRateLimiter creates a limiter with zero budget (every call is denied).
 func newZeroRateLimiter() *transport.RateLimiter {
-	return transport.NewRateLimiter(0, 0)
+	return transport.NewRateLimiter(context.Background(), 0, 0)
 }
 
 // newBurst1RateLimiter creates a limiter with 1-token burst and no sustained rate.
 func newBurst1RateLimiter() *transport.RateLimiter {
-	return transport.NewRateLimiter(0, 1)
+	return transport.NewRateLimiter(context.Background(), 0, 1)
 }
 
 // newGenerousRateLimiter creates a limiter with high rps/burst for tests that
 // should always succeed.
 func newGenerousRateLimiter() *transport.RateLimiter {
-	return transport.NewRateLimiter(1000, 1000)
+	return transport.NewRateLimiter(context.Background(), 1000, 1000)
 }
 
 func TestRateLimitUnaryInterceptor_NonRateLimitedMethod(t *testing.T) {

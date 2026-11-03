@@ -16,7 +16,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/kvsuharev/passwordkeeper/api/gen"
 	"github.com/kvsuharev/passwordkeeper/internal/server/auth"
@@ -80,7 +82,9 @@ func runServe(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	ctx := context.Background()
+	// Graceful shutdown: cancel ctx on SIGINT/SIGTERM.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	// Schema migrations.
 	slog.Info("running migrations")
@@ -120,8 +124,8 @@ func runServe(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("load TLS: %w", err)
 	}
 
-	// Rate limiter for Login and Register.
-	rateLimiter := transport.NewRateLimiter(cfg.LoginRateRPS, cfg.LoginRateBurst)
+	// Rate limiter for Login and Register (cleanup goroutine tied to server lifetime).
+	rateLimiter := transport.NewRateLimiter(ctx, cfg.LoginRateRPS, cfg.LoginRateBurst)
 
 	// gRPC server.
 	maxMsgBytes := int(cfg.MaxBinaryMB) * 1024 * 1024
@@ -151,10 +155,6 @@ func runServe(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("listen %s: %w", cfg.GRPCAddr, err)
 	}
 
-	// Graceful shutdown on SIGINT/SIGTERM.
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-
 	errCh := make(chan error, 1)
 	go func() {
 		slog.Info("server started", "addr", cfg.GRPCAddr)
@@ -164,8 +164,8 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	}()
 
 	select {
-	case sig := <-stop:
-		slog.Info("shutting down", "signal", sig)
+	case <-ctx.Done():
+		slog.Info("shutting down")
 		grpcSrv.GracefulStop()
 	case err := <-errCh:
 		return fmt.Errorf("serve: %w", err)
@@ -193,7 +193,7 @@ func loggingUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()
 		resp, err := handler(ctx, req)
-		log.Info("rpc", "method", info.FullMethod, "duration", time.Since(start), "error", err)
+		logRPC(log, "rpc", info.FullMethod, time.Since(start), err)
 		return resp, err
 	}
 }
@@ -203,7 +203,32 @@ func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		start := time.Now()
 		err := handler(srv, ss)
-		log.Info("rpc_stream", "method", info.FullMethod, "duration", time.Since(start), "error", err)
+		logRPC(log, "rpc_stream", info.FullMethod, time.Since(start), err)
 		return err
 	}
+}
+
+// isServerError reports whether a gRPC error code indicates a server-side fault
+// (as opposed to a client mistake like bad input or missing auth).
+func isServerError(err error) bool {
+	switch status.Code(err) {
+	case codes.Internal, codes.Unavailable, codes.DataLoss, codes.Unknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// logRPC emits a structured log entry at Debug level for client errors and at
+// Error level for server faults. Successful calls are logged at Debug.
+func logRPC(log *slog.Logger, event, method string, dur time.Duration, err error) {
+	args := []any{"method", method, "duration", dur}
+	if err != nil {
+		args = append(args, "error", err)
+		if isServerError(err) {
+			log.Error(event, args...)
+			return
+		}
+	}
+	log.Debug(event, args...)
 }

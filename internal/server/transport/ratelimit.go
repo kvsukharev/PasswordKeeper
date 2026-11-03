@@ -34,14 +34,14 @@ type RateLimiter struct {
 
 // NewRateLimiter creates a RateLimiter allowing rps sustained requests per
 // second with an initial burst of burst. Idle entries are evicted every five
-// minutes.
-func NewRateLimiter(rps float64, burst int) *RateLimiter {
+// minutes. The cleanup goroutine stops when ctx is cancelled.
+func NewRateLimiter(ctx context.Context, rps float64, burst int) *RateLimiter {
 	rl := &RateLimiter{
 		ips:   make(map[string]*ipEntry),
 		rps:   rate.Limit(rps),
 		burst: burst,
 	}
-	go rl.cleanupLoop()
+	go rl.cleanupLoop(ctx)
 	return rl
 }
 
@@ -60,17 +60,22 @@ func (rl *RateLimiter) Allow(addr string) bool {
 }
 
 // cleanupLoop evicts entries that have not been seen for more than five minutes.
-func (rl *RateLimiter) cleanupLoop() {
+func (rl *RateLimiter) cleanupLoop(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	for range ticker.C {
-		rl.mu.Lock()
-		for ip, e := range rl.ips {
-			if time.Since(e.lastSeen) > 5*time.Minute {
-				delete(rl.ips, ip)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			rl.mu.Lock()
+			for ip, e := range rl.ips {
+				if time.Since(e.lastSeen) > 5*time.Minute {
+					delete(rl.ips, ip)
+				}
 			}
+			rl.mu.Unlock()
 		}
-		rl.mu.Unlock()
 	}
 }
 

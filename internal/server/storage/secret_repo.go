@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kvsuharev/passwordkeeper/internal/errs"
@@ -48,6 +49,10 @@ func (r *secretRepo) Create(ctx context.Context, s *model.Secret) error {
 		s.ID, s.UserID, string(s.Type), s.Name, s.Payload,
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgErrUniqueViolation {
+			return fmt.Errorf("create secret %q: %w", s.ID, errs.ErrAlreadyExists)
+		}
 		return fmt.Errorf("create secret: %w", err)
 	}
 	return nil

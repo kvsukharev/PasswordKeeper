@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -30,20 +31,25 @@ func NewSessionStore(db *sql.DB) *SessionStore {
 	return &SessionStore{db: db}
 }
 
-// Save writes all session fields to the session table (upsert).
+// Save writes all session fields to the session table (upsert) atomically.
 func (s *SessionStore) Save(ctx context.Context, sess *Session) error {
-	pairs := map[string]string{
-		"login":         sess.Login,
-		"access_token":  sess.AccessToken,
-		"refresh_token": sess.RefreshToken,
-		"expires_at":    sess.ExpiresAt.UTC().Format(time.RFC3339),
+	pairs := [4][2]string{
+		{"login", sess.Login},
+		{"access_token", sess.AccessToken},
+		{"refresh_token", sess.RefreshToken},
+		{"expires_at", sess.ExpiresAt.UTC().Format(time.RFC3339)},
 	}
-	for k, v := range pairs {
-		if err := s.set(ctx, k, v); err != nil {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin session save: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	for _, p := range pairs {
+		if err := setTx(ctx, tx, p[0], p[1]); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 // Load reads all session fields from the session table.
@@ -82,29 +88,42 @@ func (s *SessionStore) Clear(ctx context.Context) error {
 	return nil
 }
 
-// UpdateTokens replaces only the token fields in the session.
+// UpdateTokens replaces only the token fields in the session atomically.
 func (s *SessionStore) UpdateTokens(ctx context.Context, accessToken, refreshToken string, expiresAt time.Time) error {
-	pairs := map[string]string{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-		"expires_at":    expiresAt.UTC().Format(time.RFC3339),
+	pairs := [3][2]string{
+		{"access_token", accessToken},
+		{"refresh_token", refreshToken},
+		{"expires_at", expiresAt.UTC().Format(time.RFC3339)},
 	}
-	for k, v := range pairs {
-		if err := s.set(ctx, k, v); err != nil {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin token update: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck
+	for _, p := range pairs {
+		if err := setTx(ctx, tx, p[0], p[1]); err != nil {
 			return err
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
-func (s *SessionStore) set(ctx context.Context, key, value string) error {
-	_, err := s.db.ExecContext(ctx,
+type execContexter interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func setTx(ctx context.Context, ex execContexter, key, value string) error {
+	_, err := ex.ExecContext(ctx,
 		`INSERT INTO session(key, value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
 		key, value)
 	if err != nil {
 		return fmt.Errorf("set session[%s]: %w", key, err)
 	}
 	return nil
+}
+
+func (s *SessionStore) set(ctx context.Context, key, value string) error {
+	return setTx(ctx, s.db, key, value)
 }
 
 func (s *SessionStore) get(ctx context.Context, key string) (string, error) {
@@ -135,4 +154,4 @@ func (s *SessionStore) SetSyncVersion(ctx context.Context, version int64) error 
 }
 
 // ErrNoSession is returned when no active session is found in the local database.
-var ErrNoSession = fmt.Errorf("not logged in: run 'passwordkeeper login' first")
+var ErrNoSession = errors.New("not logged in: run 'passwordkeeper login' first")
