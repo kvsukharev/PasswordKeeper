@@ -9,6 +9,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/kvsuharev/passwordkeeper/api/gen"
+	"github.com/kvsuharev/passwordkeeper/internal/model"
 	"github.com/kvsuharev/passwordkeeper/internal/server/service"
 )
 
@@ -34,11 +35,7 @@ func (h *AuthHandler) Register(ctx context.Context, req *pb.RegisterRequest) (*p
 		return nil, mapError(err)
 	}
 
-	return &pb.TokenPair{
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
-		ExpiresAt:    timestamppb.New(pair.ExpiresAt),
-	}, nil
+	return newTokenPair(pair), nil
 }
 
 // Login authenticates a user and returns a token pair.
@@ -52,11 +49,7 @@ func (h *AuthHandler) Login(ctx context.Context, req *pb.LoginRequest) (*pb.Toke
 		return nil, mapError(err)
 	}
 
-	return &pb.TokenPair{
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
-		ExpiresAt:    timestamppb.New(pair.ExpiresAt),
-	}, nil
+	return newTokenPair(pair), nil
 }
 
 // Refresh exchanges a valid refresh token for a new token pair.
@@ -70,11 +63,15 @@ func (h *AuthHandler) Refresh(ctx context.Context, req *pb.RefreshRequest) (*pb.
 		return nil, mapError(err)
 	}
 
-	return &pb.TokenPair{
-		AccessToken:  pair.AccessToken,
-		RefreshToken: pair.RefreshToken,
-		ExpiresAt:    timestamppb.New(pair.ExpiresAt),
-	}, nil
+	return newTokenPair(pair), nil
+}
+
+func newTokenPair(pair *model.TokenPair) *pb.TokenPair {
+	tp := &pb.TokenPair{}
+	tp.AccessToken = pair.AccessToken
+	tp.RefreshToken = pair.RefreshToken
+	tp.ExpiresAt = timestamppb.New(pair.ExpiresAt)
+	return tp
 }
 
 // Logout invalidates the given refresh token.

@@ -16,7 +16,9 @@ import (
 
 	"github.com/spf13/cobra"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/kvsuharev/passwordkeeper/api/gen"
 	"github.com/kvsuharev/passwordkeeper/internal/server/auth"
@@ -83,6 +85,9 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
 	// Schema migrations.
+	if cfg.DatabaseDSN == "" {
+		return fmt.Errorf("database DSN is required (--dsn or PASSWORDKEEPER_DATABASE_DSN)")
+	}
 	slog.Info("running migrations")
 	err = storage.RunMigrations(ctx, cfg.DatabaseDSN)
 	if err != nil {
@@ -103,6 +108,9 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	secretRepo := storage.NewSecretRepo(pool)
 
 	// Token manager.
+	if cfg.JWTSecret == "" {
+		return fmt.Errorf("JWT secret is required (--jwt-secret or PASSWORDKEEPER_JWT_SECRET)")
+	}
 	tokenMgr := auth.NewManager(
 		cfg.JWTSecret,
 		time.Duration(cfg.AccessTTLMin)*time.Minute,
@@ -177,6 +185,12 @@ func runServe(cmd *cobra.Command, _ []string) error {
 
 // loadTLS loads the TLS key pair and returns gRPC server credentials.
 func loadTLS(certFile, keyFile string) (credentials.TransportCredentials, error) {
+	if certFile == "" {
+		return nil, fmt.Errorf("TLS cert file is required (--tls-cert or PASSWORDKEEPER_TLS_CERT)")
+	}
+	if keyFile == "" {
+		return nil, fmt.Errorf("TLS key file is required (--tls-key or PASSWORDKEEPER_TLS_KEY)")
+	}
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("load key pair: %w", err)
@@ -189,11 +203,12 @@ func loadTLS(certFile, keyFile string) (credentials.TransportCredentials, error)
 }
 
 // loggingUnaryInterceptor logs each unary RPC call with method, duration and error.
+// Level: Info on success, Debug for client errors (4xx), Error for server faults (5xx).
 func loggingUnaryInterceptor(log *slog.Logger) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()
 		resp, err := handler(ctx, req)
-		log.Info("rpc", "method", info.FullMethod, "duration", time.Since(start), "error", err)
+		logRPC(log, "rpc", info.FullMethod, time.Since(start), err)
 		return resp, err
 	}
 }
@@ -203,7 +218,26 @@ func loggingStreamInterceptor(log *slog.Logger) grpc.StreamServerInterceptor {
 	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		start := time.Now()
 		err := handler(srv, ss)
-		log.Info("rpc_stream", "method", info.FullMethod, "duration", time.Since(start), "error", err)
+		logRPC(log, "rpc_stream", info.FullMethod, time.Since(start), err)
 		return err
+	}
+}
+
+// logRPC emits one log line per RPC:
+//   - nil error → Info (success is always visible in production)
+//   - client error (4xx codes) → not logged (expected noise, e.g. wrong password)
+//   - server fault → Error
+func logRPC(log *slog.Logger, msg, method string, dur time.Duration, err error) {
+	if err == nil {
+		log.Info(msg, "method", method, "duration", dur)
+		return
+	}
+	switch status.Code(err) {
+	case codes.Unauthenticated, codes.NotFound, codes.InvalidArgument,
+		codes.AlreadyExists, codes.Aborted, codes.ResourceExhausted,
+		codes.PermissionDenied, codes.FailedPrecondition:
+		// client-side error — expected, not worth logging in production
+	default:
+		log.Error(msg, "method", method, "duration", dur, "error", err)
 	}
 }
