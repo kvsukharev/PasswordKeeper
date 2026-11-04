@@ -39,7 +39,7 @@ func AuthUnaryInterceptor(mgr *auth.Manager) grpc.UnaryServerInterceptor {
 			return nil, err
 		}
 
-		return handler(ContextWithUserID(ctx, userID), req)
+		return handler(contextWithUserID(ctx, userID), req)
 	}
 }
 
@@ -61,7 +61,7 @@ func AuthStreamInterceptor(mgr *auth.Manager) grpc.StreamServerInterceptor {
 			return err
 		}
 
-		return handler(srv, &wrappedStream{ss, ContextWithUserID(ss.Context(), userID)})
+		return handler(srv, &wrappedStream{ss, contextWithUserID(ss.Context(), userID)})
 	}
 }
 

@@ -7,8 +7,8 @@ type ctxKey string
 
 const ctxUserID ctxKey = "userID"
 
-// ContextWithUserID returns a new context with the authenticated user's ID stored.
-func ContextWithUserID(ctx context.Context, userID string) context.Context {
+// contextWithUserID returns a new context with the authenticated user's ID stored.
+func contextWithUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, ctxUserID, userID)
 }
 

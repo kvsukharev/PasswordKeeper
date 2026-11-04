@@ -157,7 +157,9 @@ func TestSecretRepo_Integration(t *testing.T) {
 	}
 
 	t.Run("Create", func(t *testing.T) {
-		require.NoError(t, secretRepo.Create(ctx, sec))
+		created, err := secretRepo.Create(ctx, sec)
+		require.NoError(t, err)
+		sec.Version = created.Version
 	})
 
 	t.Run("GetByID", func(t *testing.T) {
@@ -172,9 +174,7 @@ func TestSecretRepo_Integration(t *testing.T) {
 		updated := *sec
 		updated.Name = "updated note"
 		updated.Payload = []byte("new-encrypted")
-		require.NoError(t, secretRepo.Update(ctx, &updated, sec.Version))
-
-		got, err := secretRepo.GetByID(ctx, owner.ID, sec.ID)
+		got, err := secretRepo.Update(ctx, &updated, sec.Version)
 		require.NoError(t, err)
 		assert.Equal(t, "updated note", got.Name)
 		assert.Greater(t, got.Version, sec.Version)
@@ -183,7 +183,7 @@ func TestSecretRepo_Integration(t *testing.T) {
 
 	t.Run("Update_wrong_version_returns_ConflictError", func(t *testing.T) {
 		bad := *sec
-		err := secretRepo.Update(ctx, &bad, sec.Version-1)
+		_, err := secretRepo.Update(ctx, &bad, sec.Version-1)
 		require.Error(t, err)
 	})
 
@@ -208,7 +208,8 @@ func TestSecretRepo_Integration(t *testing.T) {
 	})
 
 	t.Run("Delete", func(t *testing.T) {
-		require.NoError(t, secretRepo.Delete(ctx, owner.ID, sec.ID, sec.Version))
+		_, err := secretRepo.Delete(ctx, owner.ID, sec.ID, sec.Version)
+		require.NoError(t, err)
 
 		got, err := secretRepo.GetByID(ctx, owner.ID, sec.ID)
 		require.NoError(t, err)
@@ -224,11 +225,10 @@ func TestSecretRepo_Integration(t *testing.T) {
 			Name:    "fresh",
 			Payload: []byte("enc"),
 		}
-		require.NoError(t, secretRepo.Create(ctx, fresh))
-		got, err := secretRepo.GetByID(ctx, owner.ID, fresh.ID)
+		created, err := secretRepo.Create(ctx, fresh)
 		require.NoError(t, err)
 
-		err = secretRepo.Delete(ctx, owner.ID, fresh.ID, got.Version-1)
+		_, err = secretRepo.Delete(ctx, owner.ID, fresh.ID, created.Version-1)
 		require.Error(t, err)
 	})
 }
@@ -268,7 +268,9 @@ func TestIntegration_TwoClients(t *testing.T) {
 		Name:    "shared note",
 		Payload: []byte("v1-encrypted"),
 	}
-	require.NoError(t, secretRepo.Create(ctx, sec))
+	created, err := secretRepo.Create(ctx, sec)
+	require.NoError(t, err)
+	sec.Version = created.Version
 	v1, err := secretRepo.MaxVersion(ctx, owner.ID)
 	require.NoError(t, err)
 
@@ -283,7 +285,8 @@ func TestIntegration_TwoClients(t *testing.T) {
 	updated := *sec
 	updated.Payload = []byte("v2-encrypted")
 	updated.Name = "shared note v2"
-	require.NoError(t, secretRepo.Update(ctx, &updated, clientBVersion))
+	_, err = secretRepo.Update(ctx, &updated, clientBVersion)
+	require.NoError(t, err)
 	v2, err := secretRepo.MaxVersion(ctx, owner.ID)
 	require.NoError(t, err)
 	assert.Greater(t, v2, v1)
@@ -298,6 +301,6 @@ func TestIntegration_TwoClients(t *testing.T) {
 	// --- Simultaneous edit: Client B uses stale base_version → conflict ---
 	conflictAttempt := *sec
 	conflictAttempt.Payload = []byte("b-encrypted")
-	err = secretRepo.Update(ctx, &conflictAttempt, clientBVersion-1) // stale
+	_, err = secretRepo.Update(ctx, &conflictAttempt, clientBVersion-1) // stale
 	require.Error(t, err, "concurrent edit with wrong base_version should fail")
 }

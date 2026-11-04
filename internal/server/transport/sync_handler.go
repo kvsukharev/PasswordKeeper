@@ -36,16 +36,16 @@ func (h *SyncHandler) Pull(ctx context.Context, req *pb.PullRequest) (*pb.PullRe
 
 	pbSecrets := make([]*pb.Secret, 0, len(secrets))
 	for _, s := range secrets {
-		pbSecrets = append(pbSecrets, &pb.Secret{
-			Meta:    secretToMeta(s),
-			Payload: s.Payload,
-		})
+		ps := &pb.Secret{}
+		ps.Meta = secretToMeta(s)
+		ps.Payload = s.Payload
+		pbSecrets = append(pbSecrets, ps)
 	}
 
-	return &pb.PullResponse{
-		Secrets:        pbSecrets,
-		CurrentVersion: currentVersion,
-	}, nil
+	resp := &pb.PullResponse{}
+	resp.Secrets = pbSecrets
+	resp.CurrentVersion = currentVersion
+	return resp, nil
 }
 
 // Push applies a batch of local changes to the server.
@@ -78,22 +78,29 @@ func (h *SyncHandler) Push(ctx context.Context, req *pb.PushRequest) (*pb.PushRe
 
 	pbResults := make([]*pb.ChangeResult, 0, len(results))
 	for _, r := range results {
-		pbResults = append(pbResults, &pb.ChangeResult{Id: r.ID, NewVersion: r.NewVersion})
+		cr := &pb.ChangeResult{}
+		cr.Id = r.ID
+		cr.NewVersion = r.NewVersion
+		pbResults = append(pbResults, cr)
 	}
 
 	pbConflicts := make([]*pb.ConflictInfo, 0, len(conflicts))
 	for _, c := range conflicts {
-		info := &pb.ConflictInfo{Id: c.ID}
+		info := &pb.ConflictInfo{}
+		info.Id = c.ID
 		if c.ServerSecret != nil {
-			info.ServerSecret = &pb.Secret{
-				Meta:    secretToMeta(c.ServerSecret),
-				Payload: c.ServerSecret.Payload,
-			}
+			ss := &pb.Secret{}
+			ss.Meta = secretToMeta(c.ServerSecret)
+			ss.Payload = c.ServerSecret.Payload
+			info.ServerSecret = ss
 		}
 		pbConflicts = append(pbConflicts, info)
 	}
 
-	return &pb.PushResponse{Results: pbResults, Conflicts: pbConflicts}, nil
+	resp := &pb.PushResponse{}
+	resp.Results = pbResults
+	resp.Conflicts = pbConflicts
+	return resp, nil
 }
 
 func protoActionToModel(a pb.ChangeAction) (model.ChangeAction, bool) {
