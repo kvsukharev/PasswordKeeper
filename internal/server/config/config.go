@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
@@ -72,23 +71,7 @@ func Load(cmd *cobra.Command) (*Config, error) {
 		LoginRateRPS:   float64OrEnv(cmd, "login-rate-rps", "PASSWORDKEEPER_LOGIN_RATE_RPS", defaultLoginRateRPS),
 		LoginRateBurst: intOrEnv(cmd, "login-rate-burst", "PASSWORDKEEPER_LOGIN_RATE_BURST", defaultLoginRateBurst),
 	}
-	return cfg, cfg.validate()
-}
-
-func (c *Config) validate() error {
-	if c.DatabaseDSN == "" {
-		return fmt.Errorf("database DSN is required (--dsn or PASSWORDKEEPER_DATABASE_DSN)")
-	}
-	if c.TLSCertFile == "" {
-		return fmt.Errorf("TLS cert file is required (--tls-cert or PASSWORDKEEPER_TLS_CERT)")
-	}
-	if c.TLSKeyFile == "" {
-		return fmt.Errorf("TLS key file is required (--tls-key or PASSWORDKEEPER_TLS_KEY)")
-	}
-	if c.JWTSecret == "" {
-		return fmt.Errorf("JWT secret is required (--jwt-secret or PASSWORDKEEPER_JWT_SECRET)")
-	}
-	return nil
+	return cfg, nil
 }
 
 // flagOrEnv returns the flag value if explicitly set, then the env var, then the fallback.

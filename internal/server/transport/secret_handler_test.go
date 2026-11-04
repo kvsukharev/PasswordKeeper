@@ -37,6 +37,36 @@ var serverSecret = &model.Secret{
 	UpdatedAt: time.Now(),
 }
 
+func newCreateReq(id, name string, payload []byte) *pb.CreateSecretRequest {
+	r := &pb.CreateSecretRequest{}
+	r.Id = id
+	r.Name = name
+	r.Payload = payload
+	return r
+}
+
+func newGetReq(id string) *pb.GetSecretRequest {
+	r := &pb.GetSecretRequest{}
+	r.Id = id
+	return r
+}
+
+func newUpdateReq(id, name string, payload []byte, baseVersion int64) *pb.UpdateSecretRequest {
+	r := &pb.UpdateSecretRequest{}
+	r.Id = id
+	r.Name = name
+	r.Payload = payload
+	r.BaseVersion = baseVersion
+	return r
+}
+
+func newDeleteReq(id string, baseVersion int64) *pb.DeleteSecretRequest {
+	r := &pb.DeleteSecretRequest{}
+	r.Id = id
+	r.BaseVersion = baseVersion
+	return r
+}
+
 func TestSecretHandler_Create(t *testing.T) {
 	t.Parallel()
 
@@ -46,12 +76,12 @@ func TestSecretHandler_Create(t *testing.T) {
 
 		svc.EXPECT().Create(gomock.Any(), "user-1", gomock.Any()).Return(serverSecret, nil)
 
-		resp, err := h.Create(userCtx(), &pb.CreateSecretRequest{
-			Id:      "secret-uuid-1",
-			Type:    pb.SecretType_SECRET_TYPE_TEXT,
-			Name:    "my note",
-			Payload: []byte("encrypted-payload"),
-		})
+		req := &pb.CreateSecretRequest{}
+		req.Id = "secret-uuid-1"
+		req.Type = pb.SecretType_SECRET_TYPE_TEXT
+		req.Name = "my note"
+		req.Payload = []byte("encrypted-payload")
+		resp, err := h.Create(userCtx(), req)
 		require.NoError(t, err)
 		assert.Equal(t, "secret-uuid-1", resp.GetId())
 		assert.Equal(t, int64(5), resp.GetVersion())
@@ -61,9 +91,7 @@ func TestSecretHandler_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Create(userCtx(), &pb.CreateSecretRequest{
-			Name: "x", Payload: []byte("y"),
-		})
+		_, err := h.Create(userCtx(), newCreateReq("", "x", []byte("y")))
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
@@ -72,9 +100,7 @@ func TestSecretHandler_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Create(userCtx(), &pb.CreateSecretRequest{
-			Id: "x", Payload: []byte("y"),
-		})
+		_, err := h.Create(userCtx(), newCreateReq("x", "", []byte("y")))
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
@@ -83,9 +109,7 @@ func TestSecretHandler_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Create(context.Background(), &pb.CreateSecretRequest{
-			Id: "x", Name: "y", Payload: []byte("z"),
-		})
+		_, err := h.Create(context.Background(), newCreateReq("x", "y", []byte("z")))
 		require.Error(t, err)
 		assert.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
@@ -96,9 +120,7 @@ func TestSecretHandler_Create(t *testing.T) {
 
 		svc.EXPECT().Create(gomock.Any(), "user-1", gomock.Any()).Return(nil, assert.AnError)
 
-		_, err := h.Create(userCtx(), &pb.CreateSecretRequest{
-			Id: "x", Name: "y", Payload: []byte("z"),
-		})
+		_, err := h.Create(userCtx(), newCreateReq("x", "y", []byte("z")))
 		require.Error(t, err)
 		assert.Equal(t, codes.Internal, status.Code(err))
 	})
@@ -113,7 +135,7 @@ func TestSecretHandler_Get(t *testing.T) {
 
 		svc.EXPECT().Get(gomock.Any(), "user-1", "secret-uuid-1").Return(serverSecret, nil)
 
-		resp, err := h.Get(userCtx(), &pb.GetSecretRequest{Id: "secret-uuid-1"})
+		resp, err := h.Get(userCtx(), newGetReq("secret-uuid-1"))
 		require.NoError(t, err)
 		assert.Equal(t, []byte("encrypted-payload"), resp.GetPayload())
 	})
@@ -122,7 +144,7 @@ func TestSecretHandler_Get(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Get(userCtx(), &pb.GetSecretRequest{Id: ""})
+		_, err := h.Get(userCtx(), newGetReq(""))
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
@@ -133,7 +155,7 @@ func TestSecretHandler_Get(t *testing.T) {
 
 		svc.EXPECT().Get(gomock.Any(), "user-1", "missing").Return(nil, errs.ErrNotFound)
 
-		_, err := h.Get(userCtx(), &pb.GetSecretRequest{Id: "missing"})
+		_, err := h.Get(userCtx(), newGetReq("missing"))
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, status.Code(err))
 	})
@@ -142,7 +164,7 @@ func TestSecretHandler_Get(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Get(context.Background(), &pb.GetSecretRequest{Id: "x"})
+		_, err := h.Get(context.Background(), newGetReq("x"))
 		require.Error(t, err)
 		assert.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
@@ -159,12 +181,7 @@ func TestSecretHandler_Update(t *testing.T) {
 		updated.Version = 6
 		svc.EXPECT().Update(gomock.Any(), "user-1", gomock.Any(), int64(5)).Return(&updated, nil)
 
-		resp, err := h.Update(userCtx(), &pb.UpdateSecretRequest{
-			Id:          "secret-uuid-1",
-			Name:        "new name",
-			Payload:     []byte("new payload"),
-			BaseVersion: 5,
-		})
+		resp, err := h.Update(userCtx(), newUpdateReq("secret-uuid-1", "new name", []byte("new payload"), 5))
 		require.NoError(t, err)
 		assert.Equal(t, int64(6), resp.GetVersion())
 	})
@@ -175,12 +192,7 @@ func TestSecretHandler_Update(t *testing.T) {
 
 		svc.EXPECT().Update(gomock.Any(), "user-1", gomock.Any(), int64(1)).Return(nil, &errs.ConflictError{CurrentVersion: 5})
 
-		_, err := h.Update(userCtx(), &pb.UpdateSecretRequest{
-			Id:          "secret-uuid-1",
-			Name:        "x",
-			Payload:     []byte("y"),
-			BaseVersion: 1,
-		})
+		_, err := h.Update(userCtx(), newUpdateReq("secret-uuid-1", "x", []byte("y"), 1))
 		require.Error(t, err)
 		assert.Equal(t, codes.Aborted, status.Code(err))
 	})
@@ -189,7 +201,7 @@ func TestSecretHandler_Update(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Update(userCtx(), &pb.UpdateSecretRequest{Name: "x", Payload: []byte("y")})
+		_, err := h.Update(userCtx(), newUpdateReq("", "x", []byte("y"), 0))
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
@@ -198,9 +210,7 @@ func TestSecretHandler_Update(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Update(context.Background(), &pb.UpdateSecretRequest{
-			Id: "x", Name: "n", Payload: []byte("p"),
-		})
+		_, err := h.Update(context.Background(), newUpdateReq("x", "n", []byte("p"), 0))
 		require.Error(t, err)
 		assert.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
@@ -217,7 +227,7 @@ func TestSecretHandler_Delete(t *testing.T) {
 		deleted.Deleted = true
 		svc.EXPECT().Delete(gomock.Any(), "user-1", "secret-uuid-1", int64(5)).Return(&deleted, nil)
 
-		resp, err := h.Delete(userCtx(), &pb.DeleteSecretRequest{Id: "secret-uuid-1", BaseVersion: 5})
+		resp, err := h.Delete(userCtx(), newDeleteReq("secret-uuid-1", 5))
 		require.NoError(t, err)
 		assert.True(t, resp.GetDeleted())
 	})
@@ -226,7 +236,7 @@ func TestSecretHandler_Delete(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Delete(userCtx(), &pb.DeleteSecretRequest{Id: ""})
+		_, err := h.Delete(userCtx(), newDeleteReq("", 0))
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
@@ -237,7 +247,7 @@ func TestSecretHandler_Delete(t *testing.T) {
 
 		svc.EXPECT().Delete(gomock.Any(), "user-1", "gone", int64(0)).Return(nil, errs.ErrNotFound)
 
-		_, err := h.Delete(userCtx(), &pb.DeleteSecretRequest{Id: "gone"})
+		_, err := h.Delete(userCtx(), newDeleteReq("gone", 0))
 		require.Error(t, err)
 		assert.Equal(t, codes.NotFound, status.Code(err))
 	})
@@ -246,7 +256,7 @@ func TestSecretHandler_Delete(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSecretHandler(ctrl)
 
-		_, err := h.Delete(context.Background(), &pb.DeleteSecretRequest{Id: "x"})
+		_, err := h.Delete(context.Background(), newDeleteReq("x", 0))
 		require.Error(t, err)
 		assert.Equal(t, codes.Unauthenticated, status.Code(err))
 	})

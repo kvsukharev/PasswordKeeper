@@ -19,6 +19,10 @@ import (
 // uploadChunkSize is the size of each gRPC streaming frame.
 const uploadChunkSize = 64 * 1024 // 64 KiB
 
+// maxUploadBytes is the client-side guard against reading oversized files.
+// It matches the server's default --max-binary-mb limit.
+const maxUploadBytes = 50 * 1024 * 1024 // 50 MiB
+
 func newUploadCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upload <file>",
@@ -57,12 +61,20 @@ func runUpload(cmd *cobra.Command, args []string) error {
 		name = filepath.Base(filePath)
 	}
 
+	fi, statErr := os.Stat(filePath)
+	if statErr != nil {
+		return fmt.Errorf("stat file: %w", statErr)
+	}
+	if fi.Size() == 0 {
+		return fmt.Errorf("file %q is empty", filePath)
+	}
+	if fi.Size() > maxUploadBytes {
+		return fmt.Errorf("file %q is too large (%d bytes, max %d)", filePath, fi.Size(), maxUploadBytes)
+	}
+
 	fileBytes, readErr := os.ReadFile(filePath)
 	if readErr != nil {
 		return fmt.Errorf("read file: %w", readErr)
-	}
-	if len(fileBytes) == 0 {
-		return fmt.Errorf("file %q is empty", filePath)
 	}
 
 	masterPwd, err := ReadPassword("Master password: ")

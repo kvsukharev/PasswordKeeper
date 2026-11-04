@@ -5,8 +5,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE users (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    login         TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
+    login         VARCHAR(64) UNIQUE NOT NULL,
+    password_hash VARCHAR(256) NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -18,8 +18,8 @@ CREATE SEQUENCE version_seq START 1;
 CREATE TABLE secrets (
     id         UUID PRIMARY KEY,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type       TEXT NOT NULL,
-    name       TEXT NOT NULL,
+    type       VARCHAR(32) NOT NULL,
+    name       VARCHAR(256) NOT NULL,
     payload    BYTEA NOT NULL,
     version    BIGINT NOT NULL DEFAULT nextval('version_seq'),
     deleted    BOOLEAN NOT NULL DEFAULT false,
@@ -29,7 +29,7 @@ CREATE TABLE secrets (
 CREATE INDEX secrets_user_version ON secrets(user_id, version);
 
 CREATE TABLE refresh_tokens (
-    token_hash TEXT PRIMARY KEY,
+    token_hash VARCHAR(256) PRIMARY KEY,
     user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     expires_at TIMESTAMPTZ NOT NULL
 );
