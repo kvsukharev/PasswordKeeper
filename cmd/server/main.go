@@ -83,6 +83,9 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
 	// Schema migrations.
+	if cfg.DatabaseDSN == "" {
+		return fmt.Errorf("database DSN is required (--dsn or PASSWORDKEEPER_DATABASE_DSN)")
+	}
 	slog.Info("running migrations")
 	err = storage.RunMigrations(ctx, cfg.DatabaseDSN)
 	if err != nil {
@@ -103,6 +106,9 @@ func runServe(cmd *cobra.Command, _ []string) error {
 	secretRepo := storage.NewSecretRepo(pool)
 
 	// Token manager.
+	if cfg.JWTSecret == "" {
+		return fmt.Errorf("JWT secret is required (--jwt-secret or PASSWORDKEEPER_JWT_SECRET)")
+	}
 	tokenMgr := auth.NewManager(
 		cfg.JWTSecret,
 		time.Duration(cfg.AccessTTLMin)*time.Minute,
@@ -177,6 +183,12 @@ func runServe(cmd *cobra.Command, _ []string) error {
 
 // loadTLS loads the TLS key pair and returns gRPC server credentials.
 func loadTLS(certFile, keyFile string) (credentials.TransportCredentials, error) {
+	if certFile == "" {
+		return nil, fmt.Errorf("TLS cert file is required (--tls-cert or PASSWORDKEEPER_TLS_CERT)")
+	}
+	if keyFile == "" {
+		return nil, fmt.Errorf("TLS key file is required (--tls-key or PASSWORDKEEPER_TLS_KEY)")
+	}
 	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 	if err != nil {
 		return nil, fmt.Errorf("load key pair: %w", err)

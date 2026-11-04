@@ -35,8 +35,7 @@ func TestSecretService_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		svc, repo := newSecretSvc(ctrl)
 
-		repo.EXPECT().Create(gomock.Any(), gomock.Any()).Return(nil)
-		repo.EXPECT().GetByID(gomock.Any(), "user-1", "secret-uuid-1").Return(testSecret, nil)
+		repo.EXPECT().Create(gomock.Any(), gomock.Any()).Return(testSecret, nil)
 
 		got, err := svc.Create(context.Background(), "user-1", &model.Secret{
 			ID:      "secret-uuid-1",
@@ -82,7 +81,7 @@ func TestSecretService_Create(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		svc, repo := newSecretSvc(ctrl)
 
-		repo.EXPECT().Create(gomock.Any(), gomock.Any()).Return(errs.ErrAlreadyExists)
+		repo.EXPECT().Create(gomock.Any(), gomock.Any()).Return(nil, errs.ErrAlreadyExists)
 
 		_, err := svc.Create(context.Background(), "user-1", &model.Secret{
 			ID: "x", Name: "y", Payload: []byte("z"),
@@ -145,8 +144,7 @@ func TestSecretService_Update(t *testing.T) {
 
 		updated := *testSecret
 		updated.Version = 6
-		repo.EXPECT().Update(gomock.Any(), gomock.Any(), int64(5)).Return(nil)
-		repo.EXPECT().GetByID(gomock.Any(), "user-1", "secret-uuid-1").Return(&updated, nil)
+		repo.EXPECT().Update(gomock.Any(), gomock.Any(), int64(5)).Return(&updated, nil)
 
 		got, err := svc.Update(context.Background(), "user-1", &model.Secret{
 			ID:      "secret-uuid-1",
@@ -161,7 +159,7 @@ func TestSecretService_Update(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		svc, repo := newSecretSvc(ctrl)
 
-		repo.EXPECT().Update(gomock.Any(), gomock.Any(), int64(3)).Return(&errs.ConflictError{CurrentVersion: 5})
+		repo.EXPECT().Update(gomock.Any(), gomock.Any(), int64(3)).Return(nil, &errs.ConflictError{CurrentVersion: 5})
 
 		_, err := svc.Update(context.Background(), "user-1", &model.Secret{
 			ID:      "secret-uuid-1",
@@ -191,8 +189,7 @@ func TestSecretService_Delete(t *testing.T) {
 
 		deletedRecord := *testSecret
 		deletedRecord.Deleted = true
-		repo.EXPECT().Delete(gomock.Any(), "user-1", "secret-uuid-1", int64(5)).Return(nil)
-		repo.EXPECT().GetByID(gomock.Any(), "user-1", "secret-uuid-1").Return(&deletedRecord, nil)
+		repo.EXPECT().Delete(gomock.Any(), "user-1", "secret-uuid-1", int64(5)).Return(&deletedRecord, nil)
 
 		got, err := svc.Delete(context.Background(), "user-1", "secret-uuid-1", 5)
 		require.NoError(t, err)
@@ -203,7 +200,7 @@ func TestSecretService_Delete(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		svc, repo := newSecretSvc(ctrl)
 
-		repo.EXPECT().Delete(gomock.Any(), "user-1", "secret-uuid-1", int64(2)).Return(&errs.ConflictError{CurrentVersion: 5})
+		repo.EXPECT().Delete(gomock.Any(), "user-1", "secret-uuid-1", int64(2)).Return(nil, &errs.ConflictError{CurrentVersion: 5})
 
 		_, err := svc.Delete(context.Background(), "user-1", "secret-uuid-1", 2)
 		require.ErrorIs(t, err, errs.ErrAborted)

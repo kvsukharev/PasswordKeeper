@@ -72,10 +72,10 @@ func (h *SecretHandler) Get(ctx context.Context, req *pb.GetSecretRequest) (*pb.
 		return nil, mapError(err)
 	}
 
-	return &pb.Secret{
-		Meta:    secretToMeta(s),
-		Payload: s.Payload,
-	}, nil
+	out := &pb.Secret{}
+	out.Meta = secretToMeta(s)
+	out.Payload = s.Payload
+	return out, nil
 }
 
 // Update replaces the payload of an existing secret using optimistic concurrency.
@@ -204,9 +204,9 @@ func (h *SecretHandler) Download(req *pb.DownloadRequest, stream grpc.ServerStre
 	}
 
 	// First frame: secret metadata.
-	if sendErr := stream.Send(&pb.DownloadChunk{
-		Data: &pb.DownloadChunk_Meta{Meta: secretToMeta(s)},
-	}); sendErr != nil {
+	metaChunk := &pb.DownloadChunk{}
+	metaChunk.Data = &pb.DownloadChunk_Meta{Meta: secretToMeta(s)}
+	if sendErr := stream.Send(metaChunk); sendErr != nil {
 		return sendErr
 	}
 
@@ -216,9 +216,9 @@ func (h *SecretHandler) Download(req *pb.DownloadRequest, stream grpc.ServerStre
 		if end > len(s.Payload) {
 			end = len(s.Payload)
 		}
-		if sendErr := stream.Send(&pb.DownloadChunk{
-			Data: &pb.DownloadChunk_Chunk{Chunk: s.Payload[offset:end]},
-		}); sendErr != nil {
+		dataChunk := &pb.DownloadChunk{}
+		dataChunk.Data = &pb.DownloadChunk_Chunk{Chunk: s.Payload[offset:end]}
+		if sendErr := stream.Send(dataChunk); sendErr != nil {
 			return sendErr
 		}
 	}
@@ -226,14 +226,14 @@ func (h *SecretHandler) Download(req *pb.DownloadRequest, stream grpc.ServerStre
 }
 
 func secretToMeta(s *model.Secret) *pb.SecretMeta {
-	return &pb.SecretMeta{
-		Id:        s.ID,
-		Type:      modelTypeToProto(s.Type),
-		Name:      s.Name,
-		Version:   s.Version,
-		Deleted:   s.Deleted,
-		UpdatedAt: timestamppb.New(s.UpdatedAt),
-	}
+	m := &pb.SecretMeta{}
+	m.Id = s.ID
+	m.Type = modelTypeToProto(s.Type)
+	m.Name = s.Name
+	m.Version = s.Version
+	m.Deleted = s.Deleted
+	m.UpdatedAt = timestamppb.New(s.UpdatedAt)
+	return m
 }
 
 // ProtoTypeToModel is exported for use in tests.

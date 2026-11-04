@@ -21,6 +21,28 @@ func newSyncHandler(ctrl *gomock.Controller) (*transport.SyncHandler, *mockservi
 	return transport.NewSyncHandler(svc), svc
 }
 
+func newPullRequest(sinceVersion int64) *pb.PullRequest {
+	r := &pb.PullRequest{}
+	r.SinceVersion = sinceVersion
+	return r
+}
+
+func newSecretChange(action pb.ChangeAction, id, name string, payload []byte, baseVersion int64) *pb.SecretChange {
+	ch := &pb.SecretChange{}
+	ch.Action = action
+	ch.Id = id
+	ch.Name = name
+	ch.Payload = payload
+	ch.BaseVersion = baseVersion
+	return ch
+}
+
+func newPushRequest(changes ...*pb.SecretChange) *pb.PushRequest {
+	r := &pb.PushRequest{}
+	r.Changes = changes
+	return r
+}
+
 func TestSyncHandler_Pull(t *testing.T) {
 	t.Parallel()
 
@@ -30,7 +52,7 @@ func TestSyncHandler_Pull(t *testing.T) {
 
 		svc.EXPECT().Pull(gomock.Any(), "user-1", int64(10)).Return([]*model.Secret{serverSecret}, int64(15), nil)
 
-		resp, err := h.Pull(userCtx(), &pb.PullRequest{SinceVersion: 10})
+		resp, err := h.Pull(userCtx(), newPullRequest(10))
 		require.NoError(t, err)
 		assert.Equal(t, int64(15), resp.GetCurrentVersion())
 		assert.Len(t, resp.GetSecrets(), 1)
@@ -41,7 +63,7 @@ func TestSyncHandler_Pull(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSyncHandler(ctrl)
 
-		_, err := h.Pull(context.Background(), &pb.PullRequest{})
+		_, err := h.Pull(context.Background(), newPullRequest(0))
 		require.Error(t, err)
 		assert.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
@@ -52,7 +74,7 @@ func TestSyncHandler_Pull(t *testing.T) {
 
 		svc.EXPECT().Pull(gomock.Any(), "user-1", int64(0)).Return(nil, int64(0), assert.AnError)
 
-		_, err := h.Pull(userCtx(), &pb.PullRequest{})
+		_, err := h.Pull(userCtx(), newPullRequest(0))
 		require.Error(t, err)
 	})
 
@@ -62,7 +84,7 @@ func TestSyncHandler_Pull(t *testing.T) {
 
 		svc.EXPECT().Pull(gomock.Any(), "user-1", int64(0)).Return(nil, int64(5), nil)
 
-		resp, err := h.Pull(userCtx(), &pb.PullRequest{SinceVersion: 0})
+		resp, err := h.Pull(userCtx(), newPullRequest(0))
 		require.NoError(t, err)
 		assert.Equal(t, int64(5), resp.GetCurrentVersion())
 		assert.Empty(t, resp.GetSecrets())
@@ -79,15 +101,9 @@ func TestSyncHandler_Push(t *testing.T) {
 		results := []*model.ChangeResult{{ID: "secret-uuid-1", NewVersion: 10}}
 		svc.EXPECT().Push(gomock.Any(), "user-1", gomock.Any()).Return(results, nil, nil)
 
-		resp, err := h.Push(userCtx(), &pb.PushRequest{
-			Changes: []*pb.SecretChange{{
-				Action:  pb.ChangeAction_CHANGE_ACTION_CREATE,
-				Id:      "secret-uuid-1",
-				Type:    pb.SecretType_SECRET_TYPE_TEXT,
-				Name:    "my note",
-				Payload: []byte("enc"),
-			}},
-		})
+		ch := newSecretChange(pb.ChangeAction_CHANGE_ACTION_CREATE, "secret-uuid-1", "my note", []byte("enc"), 0)
+		ch.Type = pb.SecretType_SECRET_TYPE_TEXT
+		resp, err := h.Push(userCtx(), newPushRequest(ch))
 		require.NoError(t, err)
 		require.Len(t, resp.GetResults(), 1)
 		assert.Equal(t, "secret-uuid-1", resp.GetResults()[0].GetId())
@@ -101,15 +117,8 @@ func TestSyncHandler_Push(t *testing.T) {
 		conflicts := []*model.ConflictInfo{{ID: "secret-uuid-1", ServerSecret: serverSecret}}
 		svc.EXPECT().Push(gomock.Any(), "user-1", gomock.Any()).Return(nil, conflicts, nil)
 
-		resp, err := h.Push(userCtx(), &pb.PushRequest{
-			Changes: []*pb.SecretChange{{
-				Action:      pb.ChangeAction_CHANGE_ACTION_UPDATE,
-				Id:          "secret-uuid-1",
-				Name:        "x",
-				Payload:     []byte("y"),
-				BaseVersion: 1,
-			}},
-		})
+		ch := newSecretChange(pb.ChangeAction_CHANGE_ACTION_UPDATE, "secret-uuid-1", "x", []byte("y"), 1)
+		resp, err := h.Push(userCtx(), newPushRequest(ch))
 		require.NoError(t, err)
 		assert.Empty(t, resp.GetResults())
 		require.Len(t, resp.GetConflicts(), 1)
@@ -120,12 +129,8 @@ func TestSyncHandler_Push(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSyncHandler(ctrl)
 
-		_, err := h.Push(userCtx(), &pb.PushRequest{
-			Changes: []*pb.SecretChange{{
-				Action: pb.ChangeAction_CHANGE_ACTION_UNSPECIFIED,
-				Id:     "x",
-			}},
-		})
+		ch := newSecretChange(pb.ChangeAction_CHANGE_ACTION_UNSPECIFIED, "x", "", nil, 0)
+		_, err := h.Push(userCtx(), newPushRequest(ch))
 		require.Error(t, err)
 		assert.Equal(t, codes.InvalidArgument, status.Code(err))
 	})
@@ -134,7 +139,7 @@ func TestSyncHandler_Push(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		h, _ := newSyncHandler(ctrl)
 
-		_, err := h.Push(context.Background(), &pb.PushRequest{})
+		_, err := h.Push(context.Background(), newPushRequest())
 		require.Error(t, err)
 		assert.Equal(t, codes.Unauthenticated, status.Code(err))
 	})
@@ -145,13 +150,8 @@ func TestSyncHandler_Push(t *testing.T) {
 
 		svc.EXPECT().Push(gomock.Any(), "user-1", gomock.Any()).Return(nil, nil, assert.AnError)
 
-		_, err := h.Push(userCtx(), &pb.PushRequest{
-			Changes: []*pb.SecretChange{{
-				Action:  pb.ChangeAction_CHANGE_ACTION_CREATE,
-				Id:      "x",
-				Payload: []byte("p"),
-			}},
-		})
+		ch := newSecretChange(pb.ChangeAction_CHANGE_ACTION_CREATE, "x", "", []byte("p"), 0)
+		_, err := h.Push(userCtx(), newPushRequest(ch))
 		require.Error(t, err)
 	})
 
@@ -163,13 +163,8 @@ func TestSyncHandler_Push(t *testing.T) {
 			[]*model.ChangeResult{{ID: "x", NewVersion: 2}}, nil, nil,
 		)
 
-		resp, err := h.Push(userCtx(), &pb.PushRequest{
-			Changes: []*pb.SecretChange{{
-				Action:      pb.ChangeAction_CHANGE_ACTION_DELETE,
-				Id:          "x",
-				BaseVersion: 1,
-			}},
-		})
+		ch := newSecretChange(pb.ChangeAction_CHANGE_ACTION_DELETE, "x", "", nil, 1)
+		resp, err := h.Push(userCtx(), newPushRequest(ch))
 		require.NoError(t, err)
 		require.Len(t, resp.GetResults(), 1)
 	})

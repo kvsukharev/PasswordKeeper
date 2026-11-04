@@ -72,19 +72,25 @@ func (s *downloadStream) RecvMsg(any) error              { return nil }
 // ---- helpers ----
 
 func metaChunk(id, name string) *pb.UploadChunk {
-	return &pb.UploadChunk{
-		Data: &pb.UploadChunk_Meta{
-			Meta: &pb.CreateSecretRequest{
-				Id:   id,
-				Name: name,
-				Type: pb.SecretType_SECRET_TYPE_BINARY,
-			},
-		},
-	}
+	metaReq := &pb.CreateSecretRequest{}
+	metaReq.Id = id
+	metaReq.Name = name
+	metaReq.Type = pb.SecretType_SECRET_TYPE_BINARY
+	chunk := &pb.UploadChunk{}
+	chunk.Data = &pb.UploadChunk_Meta{Meta: metaReq}
+	return chunk
 }
 
 func dataChunk(b []byte) *pb.UploadChunk {
-	return &pb.UploadChunk{Data: &pb.UploadChunk_Chunk{Chunk: b}}
+	chunk := &pb.UploadChunk{}
+	chunk.Data = &pb.UploadChunk_Chunk{Chunk: b}
+	return chunk
+}
+
+func newDownloadReq(id string) *pb.DownloadRequest {
+	r := &pb.DownloadRequest{}
+	r.Id = id
+	return r
 }
 
 var binarySecret = &model.Secret{
@@ -260,7 +266,7 @@ func TestSecretHandler_Download_Success(t *testing.T) {
 	svc.EXPECT().Get(gomock.Any(), "user-1", "bin-id").Return(binarySecret, nil)
 
 	stream := newDownloadStream(userCtx())
-	err := h.Download(&pb.DownloadRequest{Id: "bin-id"}, stream)
+	err := h.Download(newDownloadReq("bin-id"), stream)
 	require.NoError(t, err)
 
 	// First frame must be meta; rest are data chunks.
@@ -278,7 +284,7 @@ func TestSecretHandler_Download_EmptyID(t *testing.T) {
 	h := transport.NewSecretHandler(mockservice.NewMockSecretService(ctrl), 0)
 
 	stream := newDownloadStream(userCtx())
-	err := h.Download(&pb.DownloadRequest{Id: ""}, stream)
+	err := h.Download(newDownloadReq(""), stream)
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
@@ -290,7 +296,7 @@ func TestSecretHandler_Download_Unauthenticated(t *testing.T) {
 	h := transport.NewSecretHandler(mockservice.NewMockSecretService(ctrl), 0)
 
 	stream := newDownloadStream(context.Background())
-	err := h.Download(&pb.DownloadRequest{Id: "bin-id"}, stream)
+	err := h.Download(newDownloadReq("bin-id"), stream)
 	require.Error(t, err)
 	assert.Equal(t, codes.Unauthenticated, status.Code(err))
 }
@@ -305,7 +311,7 @@ func TestSecretHandler_Download_NotFound(t *testing.T) {
 	svc.EXPECT().Get(gomock.Any(), "user-1", "missing").Return(nil, errs.ErrNotFound)
 
 	stream := newDownloadStream(userCtx())
-	err := h.Download(&pb.DownloadRequest{Id: "missing"}, stream)
+	err := h.Download(newDownloadReq("missing"), stream)
 	require.Error(t, err)
 	assert.Equal(t, codes.NotFound, status.Code(err))
 }
@@ -330,7 +336,7 @@ func TestSecretHandler_Download_LargePayload(t *testing.T) {
 	svc.EXPECT().Get(gomock.Any(), "user-1", "big-id").Return(large, nil)
 
 	stream := newDownloadStream(userCtx())
-	err := h.Download(&pb.DownloadRequest{Id: "big-id"}, stream)
+	err := h.Download(newDownloadReq("big-id"), stream)
 	require.NoError(t, err)
 	// meta + ceil(130*1024/65536) = meta + 3 chunks = 4 total
 	assert.Equal(t, 4, len(stream.chunks))

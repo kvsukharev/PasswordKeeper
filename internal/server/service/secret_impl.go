@@ -23,10 +23,7 @@ func (s *secretService) Create(ctx context.Context, userID string, secret *model
 		return nil, fmt.Errorf("%w: id, name and payload are required", errs.ErrInvalidArgument)
 	}
 	secret.UserID = userID
-	if err := s.secrets.Create(ctx, secret); err != nil {
-		return nil, err
-	}
-	return s.secrets.GetByID(ctx, userID, secret.ID)
+	return s.secrets.Create(ctx, secret)
 }
 
 func (s *secretService) Get(ctx context.Context, userID, id string) (*model.Secret, error) {
@@ -48,18 +45,12 @@ func (s *secretService) Update(ctx context.Context, userID string, secret *model
 		return nil, fmt.Errorf("%w: id, name and payload are required", errs.ErrInvalidArgument)
 	}
 	secret.UserID = userID
-	if err := s.secrets.Update(ctx, secret, baseVersion); err != nil {
-		return nil, err
-	}
-	return s.secrets.GetByID(ctx, userID, secret.ID)
+	return s.secrets.Update(ctx, secret, baseVersion)
 }
 
 func (s *secretService) Delete(ctx context.Context, userID, id string, baseVersion int64) (*model.Secret, error) {
 	if id == "" {
 		return nil, fmt.Errorf("%w: id is required", errs.ErrInvalidArgument)
 	}
-	if err := s.secrets.Delete(ctx, userID, id, baseVersion); err != nil {
-		return nil, err
-	}
-	return s.secrets.GetByID(ctx, userID, id)
+	return s.secrets.Delete(ctx, userID, id, baseVersion)
 }

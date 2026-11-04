@@ -177,11 +177,12 @@ func (m *MockSecretRepository) EXPECT() *MockSecretRepositoryMockRecorder {
 }
 
 // Create mocks base method.
-func (m *MockSecretRepository) Create(ctx context.Context, secret *model.Secret) error {
+func (m *MockSecretRepository) Create(ctx context.Context, secret *model.Secret) (*model.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Create", ctx, secret)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(*model.Secret)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Create indicates an expected call of Create.
@@ -206,11 +207,12 @@ func (mr *MockSecretRepositoryMockRecorder) GetByID(ctx, userID, id any) *gomock
 }
 
 // Update mocks base method.
-func (m *MockSecretRepository) Update(ctx context.Context, secret *model.Secret, baseVersion int64) error {
+func (m *MockSecretRepository) Update(ctx context.Context, secret *model.Secret, baseVersion int64) (*model.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Update", ctx, secret, baseVersion)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(*model.Secret)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Update indicates an expected call of Update.
@@ -220,11 +222,12 @@ func (mr *MockSecretRepositoryMockRecorder) Update(ctx, secret, baseVersion any)
 }
 
 // Delete mocks base method.
-func (m *MockSecretRepository) Delete(ctx context.Context, userID, id string, baseVersion int64) error {
+func (m *MockSecretRepository) Delete(ctx context.Context, userID, id string, baseVersion int64) (*model.Secret, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Delete", ctx, userID, id, baseVersion)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(*model.Secret)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Delete indicates an expected call of Delete.
